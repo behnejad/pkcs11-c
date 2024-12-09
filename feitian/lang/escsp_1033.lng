@@ -1,0 +1,161 @@
+[settings]
+CodePage=1033
+Language=English
+FontFace=Tahoma
+FontHeight=8
+
+[strings]
+;==============================================================
+; Common strings
+;==============================================================
+;1=确定
+1=OK
+;2=取消
+2=Cancel
+;==============================================================
+; Select Slot Dialog
+;==============================================================
+;106=选择U盾
+106=Select UKey
+;10002=请选择一个U盾进行操作：
+10002=Select a UKey to continue:
+;10000=名称
+10000=Name
+;10001=序列号
+10001=Serial Number
+;==============================================================
+; PIN Logon Dialog
+;==============================================================
+;107=确定
+107=OK
+;1010=现在需要验证您的U盾密码：
+1010=Verify your USB-Shield password now:
+;1011=U盾密码：
+1011=password: 
+;2000=确认
+2000=OK
+;2001=取消
+2001=Cancel
+;2003=使用软键盘
+2003=Enable soft keyboard
+;2008=修改U盾密码
+2008=Change USB-Shield password
+;20001=验证U盾密码
+20001=Verify password
+;20002=您的U盾密码已输错超过%d次，现已冻结，请到银行重置后使用
+20002=You have wrongly entered USB-Shield password for %d times, it is now frozen. Please go to the bank to reset it.
+;20003=您的U盾密码输入有误，还有%d次机会，请核对后重新输入
+20003=Wrong USB-Shield password you entered, you have %d attempts left. Check and enter again.
+;20004=您输入的U盾密码不在可接受的长度范围内，请检查并重新输入
+20004=Length of USB-Shield password is not in the acceptable range, check and enter again.
+;20005=您输入的U盾密码含有无效字符，请检查并重新输入
+20005=Invalid characters included in the USB-Shield password, check and enter again.
+;20006=您输入的U盾密码长度不正确，请检查并重新输入
+20006=Wrong length of USB-Shield password, check and enter again.
+;20007=U盾已经被移除
+20007=The UKey has been removed
+;20008=发生了未知错误，请重试或取消
+20008=Some unknown error has occurred, please retry or cancel
+;==============================================================
+; PIN Change Dialog
+;==============================================================
+;140=更改U盾密码
+140=USB-Shield password
+;2014=原U盾密码：
+2014=Old password  
+;2015=新U盾密码：
+2015=New password
+;2010=确认：
+2010=Confirm
+;1092=低
+1092=L
+;1093=中
+1093=M
+;1094=高
+1094=H
+;2017=使用软键盘
+2017=Enable soft keyboard
+;1096=检查强度
+1096=Check intensity
+;33014=两次输入的新U盾密码不一致，请检查
+33014=Two new USB-Shield passwords are entered differently, please check
+;33015=新U盾密码应不同于旧U盾密码，请重新输入
+33015=New USB-Shield passwords should not be the same as the old, enter again
+;==============================================================
+; Confirm Dialog - View, Voice and Duo
+;==============================================================
+;130=InterPass3000
+130=InterPass3000
+;1005=重读 全部(&L)
+1005=Repeat Al&l
+;1007=中止发音(&T)
+1007=Abor&t
+;1008=重读 账号(&A)
+1008=Repeat &Account
+;1009=重读 金额(&M)
+1009=Repeat &Money
+;1012=重读 金额最高位(&G)
+1012=Repeat Hi&ghest Money
+;1014=\r\n请在U盾按键确认或取消操作
+1014=\r\nTo confirm or quit the operation, please push the button on the UKey
+;1015=请在U盾按键确认或取消操作
+1015=Please click "OK" on keyboard of the Internet Banking USB-Shield,\n otherwise click "C" to cancel. 
+;1016=U盾
+1016=USBKey
+;2023=下翻
+2023=Page down
+;2031=液晶显示控制
+2031=View control
+;2032=语音提示控制
+2032=Voice control
+;2034=音量控制
+2034=Volumn control
+;2035=使用语音提示
+2035=Enable voice
+;30000=对方账号：%s
+30000=Account: %s
+;30001=转出金额：%s
+30001=Amount: %s
+;30002=户名：%s
+30002=Name：%s
+;2013=信息确认
+2013=Please verify transaction details input.
+;30003=因U盾密码累计错误多次，为保护U盾密码使用，\r\n\r\n请先在U盾按键确认，确认后将继续原处理
+30003=Too many error trials in entering USB-Shield password. To protect the use of the password, \r\n\r\n press  "OK" on your USB-Shield first, then continue 
+;30004=检测到其他程序在操作U盾，请注意！
+30004=Another program are sending command to USB-Shield, attention please!
+;==============================================================
+; PIN Dialog
+;==============================================================
+;1013=新U盾密码：
+1013=New password
+;2018=U盾初始化 - 设置新U盾密码
+2018=USB-Shield initialization-Set new password
+;33035=请输入%d - %d位U盾密码
+33035=Enter USB-Shield password of %d - %d characters
+;30036=检测到多支U盾。请保留一支要使用的U盾，移除其他
+30036=Several UKeys are detected. Please keep the one to use and remove others
+;30037=请输入相同的新U盾密码
+30037=Enter the same new USB-Shield password
+;2022=U盾正在进行操作，请稍等...\r\n\r\n请勿移除U盾！
+2022=The UKey is in operation now, please wait...\r\n\r\nDO NOT remove the UKey! 
+;30073=密码中未包含数字和字母的组合，为保证您的密码安全，建议重新设置，是否继续？
+30073=The password does not contain any combination of numbers and letters. For security purpose, please reset your passwords or you may disregard this message to continue.
+;30074=密码中包含多个连续的数字，为保证您的密码安全，建议重新设置，是否继续？
+30074=The password contains consecutive numbers. For security purpose, please reset your passwords or you may disregard this message to continue.
+;30075=密码中包含多个连续的字母，为保证您的密码安全，建议重新设置，是否继续？
+30075=The password contains consecutive letters. For security purpose, please reset your passwords or you may disregard this message to continue.
+;30076=密码中包含多个连续相同的数字，为保证您的密码安全，建议重新设置，是否继续？
+30076=The password contains consecutive repeated numbers. For security purpose, please reset your passwords or you may disregard this message to continue.
+;30077=密码中包含多个连续相同的字母，为保证您的密码安全，建议重新设置，是否继续？
+30077=The password contains consecutive repeated letters. For security purpose, please reset your passwords or you may disregard this message to continue.
+;30078=您设置的密码位数过低，建议重新设置，是否继续？
+30078=The password entered is not long enough.  Please re-enter new password not less than 6-digit  
+;30079=请避免设置过于简单的密码，如顺序或重复的字符等。
+30079=For your protection, please do not use popular sequences or simple combination for your password (such as 123456 or SSSSSS).
+;31007=! 大写锁定打开
+31007=Caps Lock is On!
+;31008=保持大写锁定打开可能会使您错误输入密码。\r\n在输入密码之前，您应该按“Caps Lock”键来将其关闭。
+31008=Password is case sensitive.  \r\nPlease check the “Caps Lock” and re-enter the correct password in upper or lower case characters.
+;31009=(高柜)
+31009=(Separated counter)
