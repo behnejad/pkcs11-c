@@ -63,6 +63,9 @@ int main(int argc, char * argv[])
 	CK_ULONG total_slot = MAX_SLOT_COUNT;
 	CK_SLOT_INFO slot_info;
 	CK_TOKEN_INFO token_info;
+	const char publicExponent[] = {0x01, 0x00, 0x00, 0x00, 0x01}; //public exponent - 65537
+	const char curve[] = {0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22}; // hex representation for secp384r1 curve.
+	const char data[] = "random value";
 
 	// ePass3003
 //	const char * SO_PIN = "rockey";
@@ -75,7 +78,7 @@ int main(int argc, char * argv[])
 //	const char * lib_path = "../feitian/libRastinPKCS11.so";
 
 	// SoftHSM
-//	const char * SO_PIN = "5528999";
+	const char * SO_PIN = "5528999";
 	const char * USER_PIN = "123456";
 	const char * lib_path = "/usr/local/lib/softhsm/libsofthsm2.so";
 
@@ -84,31 +87,21 @@ int main(int argc, char * argv[])
 	if (pkcs11_load_functions(handle) != 0) goto exit;
 	if (pkcs11_init_library(handle) != 0) goto exit;
 	if (pkcs11_get_slot_list(handle, 1, slot_list, &total_slot) != 0) goto exit;
-	for (CK_LONG i = 0; i < total_slot; ++i)
-	{
-		if (pkcs11_get_slot_info(handle, slot_list[i], &slot_info) == 0)
-			pkcs11_print_slot_info(&slot_info);
-		printf("\\____\n");
-		if (pkcs11_get_token_info(handle, slot_list[i], &token_info) == 0)
-			pkcs11_print_token_info(&token_info);
-	}
+//	for (CK_LONG i = 0; i < total_slot; ++i){
+//		if (pkcs11_get_slot_info(handle, slot_list[i], &slot_info) == 0)
+//			pkcs11_print_slot_info(&slot_info);
+//		if (pkcs11_get_token_info(handle, slot_list[i], &token_info) == 0)
+//			pkcs11_print_token_info(&token_info);
+//		printf("\\____\n");
+//	}
 	if (pkcs11_open_session(handle, slot_list[0], CKF_SERIAL_SESSION | CKF_RW_SESSION) != 0) goto exit;
-
-
-//	if (open_session(slot_list[0], &session) != 0) goto exit_finalize;
-
-//	if (login(session, CKU_SO, SO_PIN) != 0) goto exit_session;
-//	if (login(session, CKU_USER, USER_PIN) != 0) goto exit_session;
-
-//	CK_OBJECT_HANDLE obj_handle, obj_public_handle, obj_private_handle;
-
-//	generate_3des(session, "gen_3des_1", &obj_handle);
-//	generate_aes(session, "gen_aes_1", 128, &obj_handle);
-//	generate_rsa(session, "gen_rsa_1", 2048, &obj_public_handle, &obj_private_handle);
-//	CK_BYTE curve[] = {0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22}; // hex representation for secp384r1 curve.
-//	generate_ecdsa(session, "gen_ecdsa_1", curve, sizeof(curve), &obj_public_handle, &obj_private_handle);
-
-//	create_data(session, "gen_data_1", "random value",  &obj_handle);
+//	if (pkcs11_login(handle, CKU_SO, SO_PIN) != 0) goto exit;
+	if (pkcs11_login(handle, CKU_USER, USER_PIN) != 0) goto exit;
+//	if (pkcs11_generate_3des(handle, "gen_3des_1") != 0) goto exit;
+//	if (pkcs11_generate_aes(handle, "gen_aes_1", 128) != 0) goto exit;
+//	if (pkcs11_generate_rsa(handle, "gen_rsa_1", 2048, publicExponent, sizeof(publicExponent)) != 0) goto exit;
+//	if (pkcs11_generate_ecdsa(handle, "gen_ecdsa_1", curve, sizeof(curve)) != 0) goto exit;
+//	if (pkcs11_create_data(handle, "gen_data_1", data, strlen(data)) != 0) goto exit;
 
 //	char buffer[10] = {0};
 //	seed_random(session, buffer, sizeof(buffer));

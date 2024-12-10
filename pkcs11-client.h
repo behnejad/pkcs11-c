@@ -56,8 +56,13 @@
 
 #include <dlfcn.h>
 
-#define PKCS11_DEFAULT_DLOPEN		RTLD_LAZY | RTLD_LOCAL
-#define MAX_LABEL_LEN				100
+#define PKCS11_DEFAULT_DLOPEN			RTLD_LAZY | RTLD_LOCAL
+#define MAX_LABEL_LEN					100
+#define MAX_PIN_LEN						16
+#define MIN_PIN_LEN						4
+
+#define PUBLIC_OBJECT_POST_FIX			"_pub"
+#define PRIVATE_OBJECT_POST_FIX			"_prv"
 
 enum
 {
@@ -66,7 +71,7 @@ enum
 	PKCS11_ERR_NULL_PTR 				= -2,
 	PKCS11_ERR_SESSION_AVAILABLE 		= -3,
 	PKCS11_ERR_UNLOAD_LIBRARY	 		= -4,
-	PKCS11_ERR_HAS_STATE		 		= -5,
+	PKCS11_ERR_WRONG_LEN		 		= -5,
 	PKCS11_ERR_WRONG_STATE		 		= -6,
 	PKCS11_ERR_LIB_FUNC_NOT_FOUND		= -7,
 	PKCS11_ERR_PKCS11					= -8,
@@ -79,17 +84,25 @@ extern "C"
 {
 #endif
 
-const char * pkcs11_get_last_error_str(pkcs11_handle * handle);
 pkcs11_handle * pkcs11_load_library(const char * path, int flags);
 int pkcs11_load_functions(pkcs11_handle * handle);
 int pkcs11_init_library(pkcs11_handle * handle);
-int pkcs11_open_session(pkcs11_handle * handle, CK_SLOT_ID slot, CK_FLAGS flags);
 int pkcs11_get_slot_list(pkcs11_handle * handle, int has_token, CK_SLOT_ID_PTR slot_list, CK_ULONG_PTR slot_count);
 int pkcs11_get_slot_info(pkcs11_handle * handle, CK_SLOT_ID slot, CK_SLOT_INFO_PTR info);
-void pkcs11_print_slot_info(CK_SLOT_INFO_PTR slot_info);
 int pkcs11_get_token_info(pkcs11_handle * handle, CK_SLOT_ID slot, CK_TOKEN_INFO_PTR info);
-void pkcs11_print_token_info(CK_TOKEN_INFO_PTR token_info);
+int pkcs11_open_session(pkcs11_handle * handle, CK_SLOT_ID slot, CK_FLAGS flags);
+int pkcs11_login(pkcs11_handle * handle, int user, const char * pin);
+int pkcs11_generate_3des(pkcs11_handle * handle, const char * label);
+int pkcs11_generate_aes(pkcs11_handle * handle, const char * label, size_t size);
+int pkcs11_generate_rsa(pkcs11_handle * handle, const char * label, CK_ULONG size, const char * expo, size_t expo_len);
+int pkcs11_generate_ecdsa(pkcs11_handle * handle, const char * label, const char * curve, size_t size);
+int pkcs11_create_data(pkcs11_handle * handle, const char * label, const char * value, size_t len);
 int pkcs11_free(pkcs11_handle * handle);
+
+void pkcs11_print_slot_info(CK_SLOT_INFO_PTR slot_info);
+void pkcs11_print_token_info(CK_TOKEN_INFO_PTR token_info);
+const char * pkcs11_get_last_error_str(pkcs11_handle * handle);
+
 
 #ifdef __cplusplus
 }

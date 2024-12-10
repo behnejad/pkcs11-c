@@ -21,8 +21,8 @@
 
 #define CHECK_STATE_LESS(handle, st) \
 	do { \
-	if ((handle) == NULL) return PKCS11_ERR_NULL_PTR; \
-	if ((handle)->state < (st)) return PKCS11_ERR_WRONG_STATE; \
+		if ((handle) == NULL) return PKCS11_ERR_NULL_PTR; \
+		if ((handle)->state < (st)) return PKCS11_ERR_WRONG_STATE; \
 	} while (0)
 
 static const CK_BBOOL yes = CK_TRUE;
@@ -44,6 +44,9 @@ typedef struct pkcs11_handle_t
 	CK_FUNCTION_LIST * func_list;
 	CK_SESSION_HANDLE session;
 	CK_RV pkcs_error;
+	CK_OBJECT_HANDLE last_object_handle;
+	CK_OBJECT_HANDLE last_object_public;
+	CK_OBJECT_HANDLE last_object_private;
 	int state;
 } pkcs11_handle;
 
@@ -185,20 +188,6 @@ int pkcs11_init_library(pkcs11_handle * handle)
 	return PKCS11_OK;
 }
 
-int pkcs11_open_session(pkcs11_handle * handle, CK_SLOT_ID slot, CK_FLAGS flags)
-{
-	CHECK_STATE_FIX(handle, PKCS11_STATE_INITIALIZED);
-
-	handle->pkcs_error = handle->func_list->C_OpenSession(slot, flags, NULL, NULL, &handle->session);
-	if (handle->pkcs_error != CKR_OK)
-	{
-		handle->session = 0;
-		return PKCS11_ERR_PKCS11;
-	}
-
-	return PKCS11_OK;
-}
-
 int pkcs11_get_slot_list(pkcs11_handle * handle, int has_token, CK_SLOT_ID_PTR slot_list, CK_ULONG_PTR slot_count)
 {
 	CHECK_STATE_LESS(handle, PKCS11_STATE_INITIALIZED);
@@ -238,27 +227,61 @@ int pkcs11_get_token_info(pkcs11_handle * handle, CK_SLOT_ID slot, CK_TOKEN_INFO
 	return PKCS11_OK;
 }
 
-/*
-
-int login(CK_SESSION_HANDLE session, int user, const char * pin)
+int pkcs11_open_session(pkcs11_handle * handle, CK_SLOT_ID slot, CK_FLAGS flags)
 {
-	CK_RV rv;
-	rv = pkcs11->C_Login(session, user, pin, strlen(pin));
-	if (rv != CKR_OK)
+	CHECK_STATE_FIX(handle, PKCS11_STATE_INITIALIZED);
+
+	handle->pkcs_error = handle->func_list->C_OpenSession(slot, flags, NULL, NULL, &handle->session);
+	if (handle->pkcs_error != CKR_OK)
 	{
-		printf("C_Login failed: %s\n", ckr_text(rv));
-		return -1;
+		handle->session = 0;
+		return PKCS11_ERR_PKCS11;
 	}
 
-//	printf("logged in\n");
-	return 0;
+	handle->state = PKCS11_STATE_HAS_SESSION;
+	return PKCS11_OK;
 }
 
-int generate_3des(CK_SESSION_HANDLE session, CK_UTF8CHAR_PTR label, CK_OBJECT_HANDLE_PTR objHandle)
+int pkcs11_login(pkcs11_handle * handle, int user, const char * pin)
 {
-	CK_RV rv;
-	CK_MECHANISM mech = {CKM_DES3_KEY_GEN};
+	CHECK_STATE_FIX(handle, PKCS11_STATE_HAS_SESSION);
 
+	if (pin == NULL)
+	{
+		return PKCS11_ERR_NULL_PTR;
+	}
+
+	size_t len = strlen(pin);
+	if (len > MAX_PIN_LEN || len < MIN_PIN_LEN)
+	{
+		return PKCS11_ERR_WRONG_LEN;
+	}
+
+	handle->pkcs_error = handle->func_list->C_Login(handle->session, user, pin, len);
+	if (handle->pkcs_error != CKR_OK)
+	{
+		return PKCS11_ERR_PKCS11;
+	}
+
+	handle->state = PKCS11_STATE_LOGGED_IN;
+	return PKCS11_OK;
+}
+
+int pkcs11_generate_3des(pkcs11_handle * handle, const char * label)
+{
+	CHECK_STATE_FIX(handle, PKCS11_STATE_LOGGED_IN);
+
+	if (label == NULL)
+	{
+		return PKCS11_ERR_NULL_PTR;
+	}
+
+	if (strlen(label) > MAX_LABEL_LEN)
+	{
+		return PKCS11_ERR_WRONG_LEN;
+	}
+
+	CK_MECHANISM mech = {CKM_DES3_KEY_GEN};
 	CK_ATTRIBUTE attrib[] =
 	{
 		{CKA_TOKEN,         &yes,       sizeof(CK_BBOOL)},
@@ -272,20 +295,35 @@ int generate_3des(CK_SESSION_HANDLE session, CK_UTF8CHAR_PTR label, CK_OBJECT_HA
 	};
 
 	CK_ULONG attribLen = sizeof(attrib) / sizeof(*attrib);
-	rv = pkcs11->C_GenerateKey(session, &mech, attrib, attribLen, objHandle);
-	if (rv != CKR_OK)
+	handle->pkcs_error = handle->func_list->C_GenerateKey(handle->session, &mech, attrib,
+														  attribLen, &handle->last_object_handle);
+	if (handle->pkcs_error != CKR_OK)
 	{
-		printf("C_GenerateKey failed: %s\n", ckr_text(rv));
-		return -1;
+		return PKCS11_ERR_PKCS11;
 	}
 
-//	printf("%s 3des key handle: %lu\n", label, *objHandle);
-	return 0;
+	return PKCS11_OK;
 }
 
-int generate_aes(CK_SESSION_HANDLE session, CK_UTF8CHAR_PTR label, CK_ULONG size, CK_OBJECT_HANDLE_PTR objHandle)
+int pkcs11_generate_aes(pkcs11_handle * handle, const char * label, size_t size)
 {
-	CK_RV rv;
+	CHECK_STATE_FIX(handle, PKCS11_STATE_LOGGED_IN);
+
+	if (label == NULL)
+	{
+		return PKCS11_ERR_NULL_PTR;
+	}
+
+	if (strlen(label) > MAX_LABEL_LEN)
+	{
+		return PKCS11_ERR_WRONG_LEN;
+	}
+
+	if (size != 128 && size != 192 && size != 256)
+	{
+		return PKCS11_ERR_WRONG_LEN;
+	}
+
 	CK_MECHANISM mech = {CKM_AES_KEY_GEN};
 	size /= 8;
 
@@ -303,27 +341,34 @@ int generate_aes(CK_SESSION_HANDLE session, CK_UTF8CHAR_PTR label, CK_ULONG size
 	};
 
 	CK_ULONG attribLen = sizeof(attrib) / sizeof(*attrib);
-	rv = pkcs11->C_GenerateKey(session, &mech, attrib, attribLen, objHandle);
-	if (rv != CKR_OK)
+	handle->pkcs_error = handle->func_list->C_GenerateKey(handle->session, &mech, attrib, attribLen, &handle->last_object_handle);
+	if (handle->pkcs_error != CKR_OK)
 	{
-		printf("C_GenerateKey failed: %s\n", ckr_text(rv));
-		return -1;
+		return PKCS11_ERR_PKCS11;
 	}
 
-//	printf("%s aes key handle: %lu\n", label, *objHandle);
-	return 0;
+	return PKCS11_OK;
 }
 
-int generate_rsa(CK_SESSION_HANDLE session, CK_UTF8CHAR_PTR label, CK_ULONG size,
-				 CK_OBJECT_HANDLE_PTR objPubHndl, CK_OBJECT_HANDLE_PTR objPriHandle)
+int pkcs11_generate_rsa(pkcs11_handle * handle, const char * label, CK_ULONG size, const char * expo, size_t expo_len)
 {
-	CK_RV rv;
+	CHECK_STATE_FIX(handle, PKCS11_STATE_LOGGED_IN);
+
+	if (label == NULL || expo == NULL)
+	{
+		return PKCS11_ERR_NULL_PTR;
+	}
+
+	if (strlen(label) > MAX_LABEL_LEN || expo_len == 0 || expo_len > (4096 / 8))
+	{
+		return PKCS11_ERR_WRONG_LEN;
+	}
+
 	CK_MECHANISM mech = {CKM_RSA_PKCS_KEY_PAIR_GEN};
-	CK_BYTE publicExponent[] = {0x01, 0x00, 0x00, 0x00, 0x01}; //public exponent - 65537
-	CK_UTF8CHAR pubLabel[150];
-	CK_UTF8CHAR priLabel[150];
-	sprintf(pubLabel, "%s_pub", label);
-	sprintf(priLabel, "%s_prv", label);
+	CK_UTF8CHAR pubLabel[MAX_LABEL_LEN + 20];
+	CK_UTF8CHAR priLabel[MAX_LABEL_LEN + 20];
+	sprintf(pubLabel, "%s" PUBLIC_OBJECT_POST_FIX, label);
+	sprintf(priLabel, "%s" PRIVATE_OBJECT_POST_FIX, label);
 
 	CK_ATTRIBUTE attribPub[] =
 	{
@@ -332,7 +377,7 @@ int generate_rsa(CK_SESSION_HANDLE session, CK_UTF8CHAR_PTR label, CK_ULONG size
 		{CKA_VERIFY,            &yes,               sizeof(CK_BBOOL)},
 		{CKA_ENCRYPT,           &yes,               sizeof(CK_BBOOL)},
 		{CKA_MODULUS_BITS,      &size,          	sizeof(CK_ULONG)},
-		{CKA_PUBLIC_EXPONENT,   &publicExponent,    sizeof(publicExponent)},
+		{CKA_PUBLIC_EXPONENT,   expo,    			expo_len}, // TODO, check reference
 		{CKA_LABEL,             &pubLabel,          strlen(pubLabel)}
 	};
 	CK_ULONG attribLenPub = sizeof(attribPub) / sizeof(*attribPub);
@@ -348,28 +393,35 @@ int generate_rsa(CK_SESSION_HANDLE session, CK_UTF8CHAR_PTR label, CK_ULONG size
 	};
 	CK_ULONG attribLenPri = sizeof(attribPri) / sizeof(*attribPri);
 
-	rv = pkcs11->C_GenerateKeyPair(session, &mech, attribPub, attribLenPub,
-								   attribPri, attribLenPri, objPubHndl, objPriHandle);
-	if (rv != CKR_OK)
+	handle->pkcs_error = handle->func_list->C_GenerateKeyPair(handle->session, &mech, attribPub, attribLenPub,
+															  attribPri, attribLenPri, &handle->last_object_public, &handle->last_object_private);
+	if (handle->pkcs_error != CKR_OK)
 	{
-		printf("C_GenerateKeyPair failed: %s\n", ckr_text(rv));
-		return -1;
+		return PKCS11_ERR_PKCS11;
 	}
 
-//	printf("%s rsa public key handle: %lu\n", label, *objPubHndl);
-//	printf("%s rsa private key handle: %lu\n", label, *objPriHandle);
-	return 0;
+	return PKCS11_OK;
 }
 
-int generate_ecdsa(CK_SESSION_HANDLE session, CK_UTF8CHAR_PTR label, CK_BYTE_PTR curve, CK_ULONG size,
-				   CK_OBJECT_HANDLE_PTR objPubHndl, CK_OBJECT_HANDLE_PTR objPriHandle)
+int pkcs11_generate_ecdsa(pkcs11_handle * handle, const char * label, const char * curve, size_t size)
 {
-	CK_RV rv;
+	CHECK_STATE_FIX(handle, PKCS11_STATE_LOGGED_IN);
+
+	if (label == NULL || curve == NULL)
+	{
+		return PKCS11_ERR_NULL_PTR;
+	}
+
+	if (strlen(label) > MAX_LABEL_LEN || size == 0 || size > 10)
+	{
+		return PKCS11_ERR_WRONG_LEN;
+	}
+
 	CK_MECHANISM mech = {CKM_ECDSA_KEY_PAIR_GEN};
-	CK_UTF8CHAR pubLabel[150];
-	CK_UTF8CHAR priLabel[150];
-	sprintf(pubLabel, "%s_pub", label);
-	sprintf(priLabel, "%s_prv", label);
+	CK_UTF8CHAR pubLabel[MAX_LABEL_LEN + 20];
+	CK_UTF8CHAR priLabel[MAX_LABEL_LEN + 20];
+	sprintf(pubLabel, "%s" PUBLIC_OBJECT_POST_FIX, label);
+	sprintf(priLabel, "%s" PRIVATE_OBJECT_POST_FIX, label);
 
 	CK_ATTRIBUTE attribPub[] =
 	{
@@ -393,48 +445,52 @@ int generate_ecdsa(CK_SESSION_HANDLE session, CK_UTF8CHAR_PTR label, CK_BYTE_PTR
 	};
 	CK_ULONG attribLenPri = sizeof(attribPri) / sizeof(*attribPri);
 
-	rv = pkcs11->C_GenerateKeyPair(session, &mech, attribPub, attribLenPub, attribPri,
-								   attribLenPri, objPubHndl, objPriHandle);
-	if (rv != CKR_OK)
+	handle->pkcs_error = handle->func_list->C_GenerateKeyPair(handle->session, &mech, attribPub, attribLenPub, attribPri, attribLenPri,
+															  &handle->last_object_public, &handle->last_object_private);
+	if (handle->pkcs_error != CKR_OK)
 	{
-		printf("C_GenerateKeyPair failed: %s\n", ckr_text(rv));
-		return -1;
+		return PKCS11_ERR_PKCS11;
 	}
 
-//	printf("%s ecdsa public key handle: %lu\n", label, *objPubHndl);
-//	printf("%s ecdsa private key handle: %lu\n", label, *objPriHandle);
-	return 0;
+	return PKCS11_OK;
 }
 
-int create_data(CK_SESSION_HANDLE session, CK_UTF8CHAR_PTR label, CK_UTF8CHAR_PTR value, CK_OBJECT_HANDLE_PTR objHandle)
+int pkcs11_create_data(pkcs11_handle * handle, const char * label, const char * value, size_t len)
 {
-	CK_RV rv;
-	CK_UTF8CHAR data_label[150];
-	sprintf(data_label, "%s_data", label);
-	CK_OBJECT_CLASS objClass = CKO_DATA;
+	CHECK_STATE_FIX(handle, PKCS11_STATE_LOGGED_IN);
 
+	if (label == NULL || value == NULL)
+	{
+		return PKCS11_ERR_NULL_PTR;
+	}
+
+	if (strlen(label) > MAX_LABEL_LEN || len == 0)
+	{
+		return PKCS11_ERR_WRONG_LEN;
+	}
+
+	CK_OBJECT_CLASS objClass = CKO_DATA;
 	CK_ATTRIBUTE attrib[] =
 	{
 		{CKA_CLASS,	    	&objClass,		sizeof(objClass)},
 		{CKA_TOKEN,         &yes,       	sizeof(CK_BBOOL)},
 		{CKA_PRIVATE,       &yes,       	sizeof(CK_BBOOL)},
 		{CKA_MODIFIABLE,    &no,        	sizeof(CK_BBOOL)},
-		{CKA_VALUE,	   		value,			strlen(value)},
-		{CKA_LABEL,         &data_label,    strlen(data_label)}
+		{CKA_VALUE,	   		value,			len},
+		{CKA_LABEL,         label,    		strlen(label)}
 	};
 	CK_ULONG attribLen = sizeof(attrib) / sizeof(*attrib);
 
-	rv = pkcs11->C_CreateObject(session, attrib, attribLen, objHandle);
-	if (rv != CKR_OK)
+	handle->pkcs_error = handle->func_list->C_CreateObject(handle->session, attrib, attribLen, &handle->last_object_handle);
+	if (handle->pkcs_error != CKR_OK)
 	{
-		printf("C_CreateObject failed: %s\n", ckr_text(rv));
-		return -1;
+		return PKCS11_ERR_PKCS11;
 	}
 
-//	printf("%s data handle: %lu\n", label, *objHandle);
-	return 0;
+	return PKCS11_OK;
 }
 
+/*
 int seed_random(CK_SESSION_HANDLE session, CK_BYTE_PTR data_ptr, CK_ULONG size)
 {
 	CK_RV rv;
