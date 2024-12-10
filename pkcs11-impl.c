@@ -8,141 +8,118 @@
 #include "pkcs11-impl.h"
 
 #define _GNU_SOURCE
-#include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
 #include <string.h>
 #include <dlfcn.h>
-
-static void * libHandle = NULL;
 
 static CK_BBOOL yes = CK_TRUE;
 static CK_BBOOL no = CK_FALSE;
 
-static CK_FUNCTION_LIST * pkcs11 = NULL;
-
-const char * ckr_text(CK_RV code)
+enum
 {
-	if (code == CKR_OK) return "CKR_OK";
-	else if (code == CKR_CANCEL) return "CKR_CANCEL";
-	else if (code == CKR_HOST_MEMORY) return "CKR_HOST_MEMORY";
-	else if (code == CKR_SLOT_ID_INVALID) return "CKR_SLOT_ID_INVALID";
-	else if (code == CKR_GENERAL_ERROR) return "CKR_GENERAL_ERROR";
-	else if (code == CKR_FUNCTION_FAILED) return "CKR_FUNCTION_FAILED";
-	else if (code == CKR_ARGUMENTS_BAD) return "CKR_ARGUMENTS_BAD";
-	else if (code == CKR_NO_EVENT) return "CKR_NO_EVENT";
-	else if (code == CKR_NEED_TO_CREATE_THREADS) return "CKR_NEED_TO_CREATE_THREADS";
-	else if (code == CKR_CANT_LOCK) return "CKR_CANT_LOCK";
-	else if (code == CKR_ATTRIBUTE_READ_ONLY) return "CKR_ATTRIBUTE_READ_ONLY";
-	else if (code == CKR_ATTRIBUTE_SENSITIVE) return "CKR_ATTRIBUTE_SENSITIVE";
-	else if (code == CKR_ATTRIBUTE_TYPE_INVALID) return "CKR_ATTRIBUTE_TYPE_INVALID";
-	else if (code == CKR_ATTRIBUTE_VALUE_INVALID) return "CKR_ATTRIBUTE_VALUE_INVALID";
-	else if (code == CKR_ACTION_PROHIBITED) return "CKR_?ACTION_PROHIBITED";
-	else if (code == CKR_DATA_INVALID) return "CKR_DATA_INVALID";
-	else if (code == CKR_DATA_LEN_RANGE) return "CKR_DATA_LEN_RANGE";
-	else if (code == CKR_DEVICE_ERROR) return "CKR_DEVICE_ERROR";
-	else if (code == CKR_DEVICE_MEMORY) return "CKR_DEVICE_MEMORY";
-	else if (code == CKR_DEVICE_REMOVED) return "CKR_DEVICE_REMOVED";
-	else if (code == CKR_ENCRYPTED_DATA_INVALID) return "CKR_ENCRYPTED_DATA_INVALID";
-	else if (code == CKR_ENCRYPTED_DATA_LEN_RANGE) return "CKR_ENCRYPTED_DATA_LEN_RANGE";
-	else if (code == CKR_FUNCTION_CANCELED) return "CKR_FUNCTION_CANCELED";
-	else if (code == CKR_FUNCTION_NOT_PARALLEL) return "CKR_FUNCTION_NOT_PARALLEL";
-	else if (code == CKR_FUNCTION_NOT_SUPPORTED) return "CKR_FUNCTION_NOT_SUPPORTED";
-	else if (code == CKR_KEY_HANDLE_INVALID) return "CKR_KEY_HANDLE_INVALID";
-	else if (code == CKR_KEY_SIZE_RANGE) return "CKR_KEY_SIZE_RANGE";
-	else if (code == CKR_KEY_TYPE_INCONSISTENT) return "CKR_KEY_TYPE_INCONSISTENT";
-	else if (code == CKR_KEY_NOT_NEEDED) return "CKR_KEY_NOT_NEEDED";
-	else if (code == CKR_KEY_CHANGED) return "CKR_KEY_CHANGED";
-	else if (code == CKR_KEY_NEEDED) return "CKR_KEY_NEEDED";
-	else if (code == CKR_KEY_INDIGESTIBLE) return "CKR_KEY_INDIGESTIBLE";
-	else if (code == CKR_KEY_FUNCTION_NOT_PERMITTED) return "CKR_KEY_FUNCTION_NOT_PERMITTED";
-	else if (code == CKR_KEY_NOT_WRAPPABLE) return "CKR_KEY_NOT_WRAPPABLE";
-	else if (code == CKR_KEY_UNEXTRACTABLE) return "CKR_KEY_UNEXTRACTABLE";
-	else if (code == CKR_MECHANISM_INVALID) return "CKR_MECHANISM_INVALID";
-	else if (code == CKR_MECHANISM_PARAM_INVALID) return "CKR_MECHANISM_PARAM_INVALID";
-	else if (code == CKR_OBJECT_HANDLE_INVALID) return "CKR_OBJECT_HANDLE_INVALID";
-	else if (code == CKR_OPERATION_ACTIVE) return "CKR_OPERATION_ACTIVE";
-	else if (code == CKR_OPERATION_NOT_INITIALIZED) return "CKR_OPERATION_NOT_INITIALIZED";
-	else if (code == CKR_PIN_INCORRECT) return "CKR_PIN_INCORRECT";
-	else if (code == CKR_PIN_INVALID) return "CKR_PIN_INVALID";
-	else if (code == CKR_PIN_LEN_RANGE) return "CKR_PIN_LEN_RANGE";
-	else if (code == CKR_PIN_EXPIRED) return "CKR_PIN_EXPIRED";
-	else if (code == CKR_PIN_LOCKED) return "CKR_PIN_LOCKED";
-	else if (code == CKR_SESSION_CLOSED) return "CKR_SESSION_CLOSED";
-	else if (code == CKR_SESSION_COUNT) return "CKR_SESSION_COUNT";
-	else if (code == CKR_SESSION_HANDLE_INVALID) return "CKR_SESSION_HANDLE_INVALID";
-	else if (code == CKR_SESSION_PARALLEL_NOT_SUPPORTED) return "CKR_SESSION_PARALLEL_NOT_SUPPORTED";
-	else if (code == CKR_SESSION_READ_ONLY) return "CKR_SESSION_READ_ONLY";
-	else if (code == CKR_SESSION_EXISTS) return "CKR_SESSION_EXISTS";
-	else if (code == CKR_SESSION_READ_ONLY_EXISTS) return "CKR_SESSION_READ_ONLY_EXISTS";
-	else if (code == CKR_SESSION_READ_WRITE_SO_EXISTS) return "CKR_SESSION_READ_WRITE_SO_EXISTS";
-	else if (code == CKR_SIGNATURE_INVALID) return "CKR_SIGNATURE_INVALID";
-	else if (code == CKR_SIGNATURE_LEN_RANGE) return "CKR_SIGNATURE_LEN_RANGE";
-	else if (code == CKR_TEMPLATE_INCOMPLETE) return "CKR_TEMPLATE_INCOMPLETE";
-	else if (code == CKR_TEMPLATE_INCONSISTENT) return "CKR_TEMPLATE_INCONSISTENT";
-	else if (code == CKR_TOKEN_NOT_PRESENT) return "CKR_TOKEN_NOT_PRESENT";
-	else if (code == CKR_TOKEN_NOT_RECOGNIZED) return "CKR_TOKEN_NOT_RECOGNIZED";
-	else if (code == CKR_TOKEN_WRITE_PROTECTED) return "CKR_TOKEN_WRITE_PROTECTED";
-	else if (code == CKR_UNWRAPPING_KEY_HANDLE_INVALID) return "CKR_UNWRAPPING_KEY_HANDLE_INVALID";
-	else if (code == CKR_UNWRAPPING_KEY_SIZE_RANGE) return "CKR_UNWRAPPING_KEY_SIZE_RANGE";
-	else if (code == CKR_UNWRAPPING_KEY_TYPE_INCONSISTENT) return "CKR_UNWRAPPING_KEY_TYPE_INCONSISTENT";
-	else if (code == CKR_USER_ALREADY_LOGGED_IN) return "CKR_USER_ALREADY_LOGGED_IN";
-	else if (code == CKR_USER_NOT_LOGGED_IN) return "CKR_USER_NOT_LOGGED_IN";
-	else if (code == CKR_USER_PIN_NOT_INITIALIZED) return "CKR_USER_PIN_NOT_INITIALIZED";
-	else if (code == CKR_USER_TYPE_INVALID) return "CKR_USER_TYPE_INVALID";
-	else if (code == CKR_USER_ANOTHER_ALREADY_LOGGED_IN) return "CKR_USER_ANOTHER_ALREADY_LOGGED_IN";
-	else if (code == CKR_USER_TOO_MANY_TYPES) return "CKR_USER_TOO_MANY_TYPES";
-	else if (code == CKR_WRAPPED_KEY_INVALID) return "CKR_WRAPPED_KEY_INVALID";
-	else if (code == CKR_WRAPPED_KEY_LEN_RANGE) return "CKR_WRAPPED_KEY_LEN_RANGE";
-	else if (code == CKR_WRAPPING_KEY_HANDLE_INVALID) return "CKR_WRAPPING_KEY_HANDLE_INVALID";
-	else if (code == CKR_WRAPPING_KEY_SIZE_RANGE) return "CKR_WRAPPING_KEY_SIZE_RANGE";
-	else if (code == CKR_WRAPPING_KEY_TYPE_INCONSISTENT) return "CKR_WRAPPING_KEY_TYPE_INCONSISTENT";
-	else if (code == CKR_RANDOM_SEED_NOT_SUPPORTED) return "CKR_RANDOM_SEED_NOT_SUPPORTED";
-	else if (code == CKR_RANDOM_NO_RNG) return "CKR_RANDOM_NO_RNG";
-	else if (code == CKR_DOMAIN_PARAMS_INVALID) return "CKR_DOMAIN_PARAMS_INVALID";
-	else if (code == CKR_BUFFER_TOO_SMALL) return "CKR_BUFFER_TOO_SMALL";
-	else if (code == CKR_SAVED_STATE_INVALID) return "CKR_SAVED_STATE_INVALID";
-	else if (code == CKR_INFORMATION_SENSITIVE) return "CKR_INFORMATION_SENSITIVE";
-	else if (code == CKR_STATE_UNSAVEABLE) return "CKR_STATE_UNSAVEABLE";
-	else if (code == CKR_CRYPTOKI_NOT_INITIALIZED) return "CKR_CRYPTOKI_NOT_INITIALIZED";
-	else if (code == CKR_CRYPTOKI_ALREADY_INITIALIZED) return "CKR_CRYPTOKI_ALREADY_INITIALIZED";
-	else if (code == CKR_MUTEX_BAD) return "CKR_MUTEX_BAD";
-	else if (code == CKR_MUTEX_NOT_LOCKED) return "CKR_MUTEX_NOT_LOCKED";
-	else if (code == CKR_NEW_PIN_MODE) return "CKR_NEW_PIN_MODE";
-	else if (code == CKR_NEXT_OTP) return "CKR_NEXT_OTP";
-	else if (code == CKR_EXCEEDED_MAX_ITERATIONS) return "CKR_EXCEEDED_MAX_ITERATIONS";
-	else if (code == CKR_FIPS_SELF_TEST_FAILED) return "CKR_FIPS_SELF_TEST_FAILED";
-	else if (code == CKR_LIBRARY_LOAD_FAILED) return "CKR_LIBRARY_LOAD_FAILED";
-	else if (code == CKR_PIN_TOO_WEAK) return "CKR_PIN_TOO_WEAK";
-	else if (code == CKR_PUBLIC_KEY_INVALID) return "CKR_PUBLIC_KEY_INVALID";
-	else if (code == CKR_FUNCTION_REJECTED) return "CKR_FUNCTION_REJECTED";
-	else if (code & CKR_VENDOR_DEFINED) return "CKR_VENDOR_DEFINED";
-	else return "CKR_UN_DEFINED";
-}
+	PKCS11_STATE_NONE,
+	PKCS11_STATE_LIB_LOADED,
+	PKCS11_STATE_FUNCS_LOADED,
+	PKCS11_STATE_INITIALIZED,
+	PKCS11_STATE_HAS_SESSION,
+	PKCS11_STATE_LOGGED_IN,
+};
 
-int load_library(const char * path)
+typedef struct pkcs11_handle_t
 {
-	libHandle = dlopen(path, RTLD_LAZY | RTLD_LOCAL);
-	if (libHandle == NULL)
+	void * lib_handle;
+	CK_FUNCTION_LIST * func_list;
+	CK_SESSION_HANDLE session;
+	CK_RV last_error;
+	int state;
+} pkcs11_handle;
+
+int pkcs11_free(pkcs11_handle * handle)
+{
+	if (handle == NULL)
 	{
-		printf("dlopen failed\n");
-		return -1;
+		return PKCS11_ERR_NULL_PTR;
 	}
 
+	if (handle->lib_handle == NULL)
+	{
+		return PKCS11_ERR_NULL_PTR;
+	}
+
+	if (handle->state >= PKCS11_STATE_INITIALIZED)
+	{
+		return PKCS11_ERR_HAS_STATE;
+	}
+
+	if (handle->session != 0)
+	{
+		return PKCS11_ERR_SESSION_AVAILABLE;
+	}
+
+	if (handle->lib_handle != NULL && dlclose(handle->lib_handle) != 0)
+	{
+		return PKCS11_ERR_UNLOAD_LIBRARY;
+	}
+
+	free(handle);
 	return 0;
 }
 
-int init_pkcs_library()
+pkcs11_handle * pkcs11_load_library(const char * path, int flags)
+{
+	pkcs11_handle * handle = calloc(sizeof(pkcs11_handle), 1);
+	if (handle == NULL)
+	{
+		return NULL;
+	}
+
+	handle->lib_handle = dlopen(path, flags);
+	if (handle->lib_handle == NULL)
+	{
+		free(handle);
+		return NULL;
+	}
+
+	handle->state = PKCS11_STATE_LIB_LOADED;
+	return handle;
+}
+
+int pkcs11_init(pkcs11_handle * handle)
 {
 	CK_RV rv;
-	CK_C_GetFunctionList C_GetFunctionList = (CK_C_GetFunctionList) dlsym(libHandle, "C_GetFunctionList");
-	rv = C_GetFunctionList(&pkcs11);
-	if (rv != CKR_OK)
+
+	if (handle == NULL)
 	{
-		printf("C_GetFunctionList failed: %s\n", ckr_text(rv));
-		return -1;
+		return PKCS11_ERR_NULL_PTR;
 	}
 
-	return 0;
+	if (handle->state >= PKCS11_STATE_INITIALIZED)
+	{
+		return PKCS11_ERR_HAS_STATE;
+	}
+
+	if (handle->state != PKCS11_STATE_FUNCS_LOADED && handle->state != PKCS11_STATE_LIB_LOADED)
+	{
+		return PKCS11_ERR_WRONG_STATE;
+	}
+
+	CK_C_GetFunctionList C_GetFunctionList = (CK_C_GetFunctionList) dlsym(handle->lib_handle, "C_GetFunctionList");
+
+	if (C_GetFunctionList == NULL)
+	{
+		return PKCS11_ERR_LIB_FUNC_NOT_FOUND;
+	}
+
+	rv = C_GetFunctionList(&handle->func_list);
+	if (rv != CKR_OK)
+	{
+		return PKCS11_ERR;
+	}
+
+	handle->state = PKCS11_STATE_FUNCS_LOADED;
+	return PKCS11_OK;
 }
 
 int init_pkcs()
@@ -237,7 +214,6 @@ int get_slot_info(CK_SLOT_ID slot)
 	}
 
 	printf("\n");
-
 	return 0;
 }
 
@@ -251,7 +227,7 @@ int open_session(CK_SLOT_ID slot, CK_SESSION_HANDLE_PTR session)
 		return -1;
 	}
 
-	printf("Session id: %lu\n", *session);
+//	printf("Session id: %lu\n", *session);
 	return 0;
 }
 
@@ -331,16 +307,16 @@ int generate_3des(CK_SESSION_HANDLE session, CK_UTF8CHAR_PTR label, CK_OBJECT_HA
 	CK_MECHANISM mech = {CKM_DES3_KEY_GEN};
 
 	CK_ATTRIBUTE attrib[] =
-			{
-					{CKA_TOKEN,         &yes,       sizeof(CK_BBOOL)},
-					{CKA_PRIVATE,       &yes,       sizeof(CK_BBOOL)},
-					{CKA_SENSITIVE,     &yes,       sizeof(CK_BBOOL)},
-					{CKA_EXTRACTABLE,   &no,        sizeof(CK_BBOOL)},
-					{CKA_MODIFIABLE,    &no,        sizeof(CK_BBOOL)},
-					{CKA_ENCRYPT,       &yes,       sizeof(CK_BBOOL)},
-					{CKA_DECRYPT,       &yes,       sizeof(CK_BBOOL)},
-					{CKA_LABEL,         label,      strlen(label)}
-			};
+	{
+		{CKA_TOKEN,         &yes,       sizeof(CK_BBOOL)},
+		{CKA_PRIVATE,       &yes,       sizeof(CK_BBOOL)},
+		{CKA_SENSITIVE,     &yes,       sizeof(CK_BBOOL)},
+		{CKA_EXTRACTABLE,   &no,        sizeof(CK_BBOOL)},
+		{CKA_MODIFIABLE,    &no,        sizeof(CK_BBOOL)},
+		{CKA_ENCRYPT,       &yes,       sizeof(CK_BBOOL)},
+		{CKA_DECRYPT,       &yes,       sizeof(CK_BBOOL)},
+		{CKA_LABEL,         label,      strlen(label)}
+	};
 
 	CK_ULONG attribLen = sizeof(attrib) / sizeof(*attrib);
 	rv = pkcs11->C_GenerateKey(session, &mech, attrib, attribLen, objHandle);
@@ -350,7 +326,7 @@ int generate_3des(CK_SESSION_HANDLE session, CK_UTF8CHAR_PTR label, CK_OBJECT_HA
 		return -1;
 	}
 
-	printf("%s 3des key handle: %lu\n", label, *objHandle);
+//	printf("%s 3des key handle: %lu\n", label, *objHandle);
 	return 0;
 }
 
@@ -361,17 +337,17 @@ int generate_aes(CK_SESSION_HANDLE session, CK_UTF8CHAR_PTR label, CK_ULONG size
 	size /= 8;
 
 	CK_ATTRIBUTE attrib[] =
-			{
-					{CKA_TOKEN,         &yes,       sizeof(CK_BBOOL)},
-					{CKA_PRIVATE,       &yes,       sizeof(CK_BBOOL)},
-					{CKA_SENSITIVE,     &yes,       sizeof(CK_BBOOL)},
-					{CKA_EXTRACTABLE,   &yes,       sizeof(CK_BBOOL)},
-					{CKA_MODIFIABLE,    &yes,       sizeof(CK_BBOOL)},
-					{CKA_ENCRYPT,       &yes,       sizeof(CK_BBOOL)},
-					{CKA_DECRYPT,       &yes,       sizeof(CK_BBOOL)},
-					{CKA_LABEL,         label,      strlen(label)},
-					{CKA_VALUE_LEN,	    &size,		sizeof(size)}
-			};
+	{
+		{CKA_TOKEN,         &yes,       sizeof(CK_BBOOL)},
+		{CKA_PRIVATE,       &yes,       sizeof(CK_BBOOL)},
+		{CKA_SENSITIVE,     &yes,       sizeof(CK_BBOOL)},
+		{CKA_EXTRACTABLE,   &yes,       sizeof(CK_BBOOL)},
+		{CKA_MODIFIABLE,    &yes,       sizeof(CK_BBOOL)},
+		{CKA_ENCRYPT,       &yes,       sizeof(CK_BBOOL)},
+		{CKA_DECRYPT,       &yes,       sizeof(CK_BBOOL)},
+		{CKA_LABEL,         label,      strlen(label)},
+		{CKA_VALUE_LEN,	    &size,		sizeof(size)}
+	};
 
 	CK_ULONG attribLen = sizeof(attrib) / sizeof(*attrib);
 	rv = pkcs11->C_GenerateKey(session, &mech, attrib, attribLen, objHandle);
@@ -381,7 +357,7 @@ int generate_aes(CK_SESSION_HANDLE session, CK_UTF8CHAR_PTR label, CK_ULONG size
 		return -1;
 	}
 
-	printf("%s aes key handle: %lu\n", label, *objHandle);
+//	printf("%s aes key handle: %lu\n", label, *objHandle);
 	return 0;
 }
 
@@ -427,8 +403,8 @@ int generate_rsa(CK_SESSION_HANDLE session, CK_UTF8CHAR_PTR label, CK_ULONG size
 		return -1;
 	}
 
-	printf("%s rsa public key handle: %lu\n", label, *objPubHndl);
-	printf("%s rsa private key handle: %lu\n", label, *objPriHandle);
+//	printf("%s rsa public key handle: %lu\n", label, *objPubHndl);
+//	printf("%s rsa private key handle: %lu\n", label, *objPriHandle);
 	return 0;
 }
 
@@ -472,8 +448,8 @@ int generate_ecdsa(CK_SESSION_HANDLE session, CK_UTF8CHAR_PTR label, CK_BYTE_PTR
 		return -1;
 	}
 
-	printf("%s ecdsa public key handle: %lu\n", label, *objPubHndl);
-	printf("%s ecdsa private key handle: %lu\n", label, *objPriHandle);
+//	printf("%s ecdsa public key handle: %lu\n", label, *objPubHndl);
+//	printf("%s ecdsa private key handle: %lu\n", label, *objPriHandle);
 	return 0;
 }
 
@@ -502,7 +478,7 @@ int create_data(CK_SESSION_HANDLE session, CK_UTF8CHAR_PTR label, CK_UTF8CHAR_PT
 		return -1;
 	}
 
-	printf("%s data handle: %lu\n", label, *objHandle);
+//	printf("%s data handle: %lu\n", label, *objHandle);
 	return 0;
 }
 
@@ -522,7 +498,6 @@ int seed_random(CK_SESSION_HANDLE session, CK_BYTE_PTR data_ptr, CK_ULONG size)
 int generate_random(CK_SESSION_HANDLE session, CK_BYTE_PTR data_ptr, CK_ULONG size)
 {
 	CK_RV rv;
-
 	rv = pkcs11->C_GenerateRandom(session, data_ptr, size);
 	if (rv != CKR_OK)
 	{
@@ -531,4 +506,105 @@ int generate_random(CK_SESSION_HANDLE session, CK_BYTE_PTR data_ptr, CK_ULONG si
 	}
 
 	return 0;
+}
+
+const char * pkcs11_get_last_error_str(pkcs11_handle * handle)
+{
+	if (handle == NULL) return NULL;
+	CK_RV code = handle->last_error;
+	if (code == CKR_OK) return "CKR_OK";
+	else if (code == CKR_CANCEL) return "CKR_CANCEL";
+	else if (code == CKR_HOST_MEMORY) return "CKR_HOST_MEMORY";
+	else if (code == CKR_SLOT_ID_INVALID) return "CKR_SLOT_ID_INVALID";
+	else if (code == CKR_GENERAL_ERROR) return "CKR_GENERAL_ERROR";
+	else if (code == CKR_FUNCTION_FAILED) return "CKR_FUNCTION_FAILED";
+	else if (code == CKR_ARGUMENTS_BAD) return "CKR_ARGUMENTS_BAD";
+	else if (code == CKR_NO_EVENT) return "CKR_NO_EVENT";
+	else if (code == CKR_NEED_TO_CREATE_THREADS) return "CKR_NEED_TO_CREATE_THREADS";
+	else if (code == CKR_CANT_LOCK) return "CKR_CANT_LOCK";
+	else if (code == CKR_ATTRIBUTE_READ_ONLY) return "CKR_ATTRIBUTE_READ_ONLY";
+	else if (code == CKR_ATTRIBUTE_SENSITIVE) return "CKR_ATTRIBUTE_SENSITIVE";
+	else if (code == CKR_ATTRIBUTE_TYPE_INVALID) return "CKR_ATTRIBUTE_TYPE_INVALID";
+	else if (code == CKR_ATTRIBUTE_VALUE_INVALID) return "CKR_ATTRIBUTE_VALUE_INVALID";
+	else if (code == CKR_ACTION_PROHIBITED) return "CKR_ACTION_PROHIBITED";
+	else if (code == CKR_DATA_INVALID) return "CKR_DATA_INVALID";
+	else if (code == CKR_DATA_LEN_RANGE) return "CKR_DATA_LEN_RANGE";
+	else if (code == CKR_DEVICE_ERROR) return "CKR_DEVICE_ERROR";
+	else if (code == CKR_DEVICE_MEMORY) return "CKR_DEVICE_MEMORY";
+	else if (code == CKR_DEVICE_REMOVED) return "CKR_DEVICE_REMOVED";
+	else if (code == CKR_ENCRYPTED_DATA_INVALID) return "CKR_ENCRYPTED_DATA_INVALID";
+	else if (code == CKR_ENCRYPTED_DATA_LEN_RANGE) return "CKR_ENCRYPTED_DATA_LEN_RANGE";
+	else if (code == CKR_FUNCTION_CANCELED) return "CKR_FUNCTION_CANCELED";
+	else if (code == CKR_FUNCTION_NOT_PARALLEL) return "CKR_FUNCTION_NOT_PARALLEL";
+	else if (code == CKR_FUNCTION_NOT_SUPPORTED) return "CKR_FUNCTION_NOT_SUPPORTED";
+	else if (code == CKR_KEY_HANDLE_INVALID) return "CKR_KEY_HANDLE_INVALID";
+	else if (code == CKR_KEY_SIZE_RANGE) return "CKR_KEY_SIZE_RANGE";
+	else if (code == CKR_KEY_TYPE_INCONSISTENT) return "CKR_KEY_TYPE_INCONSISTENT";
+	else if (code == CKR_KEY_NOT_NEEDED) return "CKR_KEY_NOT_NEEDED";
+	else if (code == CKR_KEY_CHANGED) return "CKR_KEY_CHANGED";
+	else if (code == CKR_KEY_NEEDED) return "CKR_KEY_NEEDED";
+	else if (code == CKR_KEY_INDIGESTIBLE) return "CKR_KEY_INDIGESTIBLE";
+	else if (code == CKR_KEY_FUNCTION_NOT_PERMITTED) return "CKR_KEY_FUNCTION_NOT_PERMITTED";
+	else if (code == CKR_KEY_NOT_WRAPPABLE) return "CKR_KEY_NOT_WRAPPABLE";
+	else if (code == CKR_KEY_UNEXTRACTABLE) return "CKR_KEY_UNEXTRACTABLE";
+	else if (code == CKR_MECHANISM_INVALID) return "CKR_MECHANISM_INVALID";
+	else if (code == CKR_MECHANISM_PARAM_INVALID) return "CKR_MECHANISM_PARAM_INVALID";
+	else if (code == CKR_OBJECT_HANDLE_INVALID) return "CKR_OBJECT_HANDLE_INVALID";
+	else if (code == CKR_OPERATION_ACTIVE) return "CKR_OPERATION_ACTIVE";
+	else if (code == CKR_OPERATION_NOT_INITIALIZED) return "CKR_OPERATION_NOT_INITIALIZED";
+	else if (code == CKR_PIN_INCORRECT) return "CKR_PIN_INCORRECT";
+	else if (code == CKR_PIN_INVALID) return "CKR_PIN_INVALID";
+	else if (code == CKR_PIN_LEN_RANGE) return "CKR_PIN_LEN_RANGE";
+	else if (code == CKR_PIN_EXPIRED) return "CKR_PIN_EXPIRED";
+	else if (code == CKR_PIN_LOCKED) return "CKR_PIN_LOCKED";
+	else if (code == CKR_SESSION_CLOSED) return "CKR_SESSION_CLOSED";
+	else if (code == CKR_SESSION_COUNT) return "CKR_SESSION_COUNT";
+	else if (code == CKR_SESSION_HANDLE_INVALID) return "CKR_SESSION_HANDLE_INVALID";
+	else if (code == CKR_SESSION_PARALLEL_NOT_SUPPORTED) return "CKR_SESSION_PARALLEL_NOT_SUPPORTED";
+	else if (code == CKR_SESSION_READ_ONLY) return "CKR_SESSION_READ_ONLY";
+	else if (code == CKR_SESSION_EXISTS) return "CKR_SESSION_EXISTS";
+	else if (code == CKR_SESSION_READ_ONLY_EXISTS) return "CKR_SESSION_READ_ONLY_EXISTS";
+	else if (code == CKR_SESSION_READ_WRITE_SO_EXISTS) return "CKR_SESSION_READ_WRITE_SO_EXISTS";
+	else if (code == CKR_SIGNATURE_INVALID) return "CKR_SIGNATURE_INVALID";
+	else if (code == CKR_SIGNATURE_LEN_RANGE) return "CKR_SIGNATURE_LEN_RANGE";
+	else if (code == CKR_TEMPLATE_INCOMPLETE) return "CKR_TEMPLATE_INCOMPLETE";
+	else if (code == CKR_TEMPLATE_INCONSISTENT) return "CKR_TEMPLATE_INCONSISTENT";
+	else if (code == CKR_TOKEN_NOT_PRESENT) return "CKR_TOKEN_NOT_PRESENT";
+	else if (code == CKR_TOKEN_NOT_RECOGNIZED) return "CKR_TOKEN_NOT_RECOGNIZED";
+	else if (code == CKR_TOKEN_WRITE_PROTECTED) return "CKR_TOKEN_WRITE_PROTECTED";
+	else if (code == CKR_UNWRAPPING_KEY_HANDLE_INVALID) return "CKR_UNWRAPPING_KEY_HANDLE_INVALID";
+	else if (code == CKR_UNWRAPPING_KEY_SIZE_RANGE) return "CKR_UNWRAPPING_KEY_SIZE_RANGE";
+	else if (code == CKR_UNWRAPPING_KEY_TYPE_INCONSISTENT) return "CKR_UNWRAPPING_KEY_TYPE_INCONSISTENT";
+	else if (code == CKR_USER_ALREADY_LOGGED_IN) return "CKR_USER_ALREADY_LOGGED_IN";
+	else if (code == CKR_USER_NOT_LOGGED_IN) return "CKR_USER_NOT_LOGGED_IN";
+	else if (code == CKR_USER_PIN_NOT_INITIALIZED) return "CKR_USER_PIN_NOT_INITIALIZED";
+	else if (code == CKR_USER_TYPE_INVALID) return "CKR_USER_TYPE_INVALID";
+	else if (code == CKR_USER_ANOTHER_ALREADY_LOGGED_IN) return "CKR_USER_ANOTHER_ALREADY_LOGGED_IN";
+	else if (code == CKR_USER_TOO_MANY_TYPES) return "CKR_USER_TOO_MANY_TYPES";
+	else if (code == CKR_WRAPPED_KEY_INVALID) return "CKR_WRAPPED_KEY_INVALID";
+	else if (code == CKR_WRAPPED_KEY_LEN_RANGE) return "CKR_WRAPPED_KEY_LEN_RANGE";
+	else if (code == CKR_WRAPPING_KEY_HANDLE_INVALID) return "CKR_WRAPPING_KEY_HANDLE_INVALID";
+	else if (code == CKR_WRAPPING_KEY_SIZE_RANGE) return "CKR_WRAPPING_KEY_SIZE_RANGE";
+	else if (code == CKR_WRAPPING_KEY_TYPE_INCONSISTENT) return "CKR_WRAPPING_KEY_TYPE_INCONSISTENT";
+	else if (code == CKR_RANDOM_SEED_NOT_SUPPORTED) return "CKR_RANDOM_SEED_NOT_SUPPORTED";
+	else if (code == CKR_RANDOM_NO_RNG) return "CKR_RANDOM_NO_RNG";
+	else if (code == CKR_DOMAIN_PARAMS_INVALID) return "CKR_DOMAIN_PARAMS_INVALID";
+	else if (code == CKR_BUFFER_TOO_SMALL) return "CKR_BUFFER_TOO_SMALL";
+	else if (code == CKR_SAVED_STATE_INVALID) return "CKR_SAVED_STATE_INVALID";
+	else if (code == CKR_INFORMATION_SENSITIVE) return "CKR_INFORMATION_SENSITIVE";
+	else if (code == CKR_STATE_UNSAVEABLE) return "CKR_STATE_UNSAVEABLE";
+	else if (code == CKR_CRYPTOKI_NOT_INITIALIZED) return "CKR_CRYPTOKI_NOT_INITIALIZED";
+	else if (code == CKR_CRYPTOKI_ALREADY_INITIALIZED) return "CKR_CRYPTOKI_ALREADY_INITIALIZED";
+	else if (code == CKR_MUTEX_BAD) return "CKR_MUTEX_BAD";
+	else if (code == CKR_MUTEX_NOT_LOCKED) return "CKR_MUTEX_NOT_LOCKED";
+	else if (code == CKR_NEW_PIN_MODE) return "CKR_NEW_PIN_MODE";
+	else if (code == CKR_NEXT_OTP) return "CKR_NEXT_OTP";
+	else if (code == CKR_EXCEEDED_MAX_ITERATIONS) return "CKR_EXCEEDED_MAX_ITERATIONS";
+	else if (code == CKR_FIPS_SELF_TEST_FAILED) return "CKR_FIPS_SELF_TEST_FAILED";
+	else if (code == CKR_LIBRARY_LOAD_FAILED) return "CKR_LIBRARY_LOAD_FAILED";
+	else if (code == CKR_PIN_TOO_WEAK) return "CKR_PIN_TOO_WEAK";
+	else if (code == CKR_PUBLIC_KEY_INVALID) return "CKR_PUBLIC_KEY_INVALID";
+	else if (code == CKR_FUNCTION_REJECTED) return "CKR_FUNCTION_REJECTED";
+	else if (code & CKR_VENDOR_DEFINED) return "CKR_VENDOR_DEFINED";
+	else return "CKR_UN_DEFINED";
 }

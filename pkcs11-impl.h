@@ -54,14 +54,33 @@
 
 #include "pkcs11.h"
 
+#define PKCS11_DEFAULT_DLOPEN		RTLD_LAZY | RTLD_LOCAL
+#define MAX_LABEL_LEN				100
+
+enum
+{
+	PKCS11_OK							= 0,
+	PKCS11_ERR 							= -1,
+	PKCS11_ERR_NULL_PTR 				= -2,
+	PKCS11_ERR_SESSION_AVAILABLE 		= -3,
+	PKCS11_ERR_UNLOAD_LIBRARY	 		= -4,
+	PKCS11_ERR_HAS_STATE		 		= -5,
+	PKCS11_ERR_WRONG_STATE		 		= -6,
+	PKCS11_ERR_LIB_FUNC_NOT_FOUND		= -7,
+};
+
+typedef struct pkcs11_handle_t pkcs11_handle;
+
 #ifdef __cplusplus
 extern "C"
 {
 #endif
 
-const char * ckr_text(CK_RV code);
-int load_library(const char * path);
-int init_pkcs_library();
+const char * pkcs11_get_last_error_str(pkcs11_handle * handle);
+int pkcs11_free(pkcs11_handle * handle);
+pkcs11_handle * pkcs11_load_library(const char * path, int flags);
+int pkcs11_init(pkcs11_handle * handle);
+
 int init_pkcs();
 int get_slot_count(CK_ULONG_PTR count);
 int get_slot(CK_SLOT_ID_PTR list, CK_ULONG_PTR slot_count);

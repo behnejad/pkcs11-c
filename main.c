@@ -15,8 +15,7 @@
 #include "pkcs11-impl.h"
 
 #define MAX_SLOT_COUNT		50
-
-#define STACK_FRAMES					30
+#define STACK_FRAMES		30
 
 void signal_handler(int signal)
 {
@@ -27,7 +26,7 @@ void signal_handler(int signal)
 
 	for (int i = 0; i < size; ++i)
 	{
-		printf("%02ld %s\n", i, strings[i]);
+		printf("%02d %s\n", i, strings[i]);
 	}
 
 	free(strings);
@@ -66,9 +65,11 @@ int main(int argc, char * argv[])
 	signal(SIGSTKFLT, signal_handler);
 
 	int ret_code = -1;
-	CK_SLOT_ID slot_list[MAX_SLOT_COUNT];
-	CK_ULONG total_slot = MAX_SLOT_COUNT;
-	CK_SESSION_HANDLE session;
+	pkcs11_handle * handle = NULL;
+
+//	CK_SLOT_ID slot_list[MAX_SLOT_COUNT];
+//	CK_ULONG total_slot = MAX_SLOT_COUNT;
+//	CK_SESSION_HANDLE session;
 
 	// ePass3003
 //	const char * SO_PIN = "rockey";
@@ -76,9 +77,9 @@ int main(int argc, char * argv[])
 //	const char * libPath = "../feitian/libshuttle_p11v220.so";
 
 	// rastin talaee
-	const char * SO_PIN = "rastin";
-	const char * USER_PIN = "1234";
-	const char * libPath = "../feitian/libRastinPKCS11.so";
+//	const char * SO_PIN = "rastin";
+//	const char * USER_PIN = "1234";
+//	const char * libPath = "../feitian/libRastinPKCS11.so";
 
 	// SoftHSM
 //	const char * SO_PIN = "5528999";
@@ -86,24 +87,24 @@ int main(int argc, char * argv[])
 //	const char * libPath = "/usr/local/lib/softhsm/libsofthsm2.so";
 
 //	if (load_library(argv[1]) != 0) goto exit_unload;
-	if (load_library(libPath) != 0) goto exit_unload;
+//	if (load_library(libPath) != 0) goto exit_unload;
 
-	if (init_pkcs_library() != 0) goto exit_unload;
+//	if (init_pkcs_library() != 0) goto exit_unload;
 
-	if (init_pkcs() != 0) goto exit_finalize;
+//	if (init_pkcs() != 0) goto exit_finalize;
 
-	if (get_slot_count(&total_slot) != 0) goto exit_finalize;
+//	if (get_slot_count(&total_slot) != 0) goto exit_finalize;
 
-	if (get_slot(slot_list, &total_slot) != 0) goto exit_finalize;
+//	if (get_slot(slot_list, &total_slot) != 0) goto exit_finalize;
 
-	for (CK_LONG i = 0; i < total_slot; ++i) get_slot_info(slot_list[i]);
+//	for (CK_LONG i = 0; i < total_slot; ++i) get_slot_info(slot_list[i]);
 
-	if (open_session(slot_list[0], &session) != 0) goto exit_finalize;
+//	if (open_session(slot_list[0], &session) != 0) goto exit_finalize;
 
 //	if (login(session, CKU_SO, SO_PIN) != 0) goto exit_session;
-	if (login(session, CKU_USER, USER_PIN) != 0) goto exit_session;
+//	if (login(session, CKU_USER, USER_PIN) != 0) goto exit_session;
 
-	CK_OBJECT_HANDLE obj_handle, obj_public_handle, obj_private_handle;
+//	CK_OBJECT_HANDLE obj_handle, obj_public_handle, obj_private_handle;
 
 //	generate_3des(session, "gen_3des_1", &obj_handle);
 //	generate_aes(session, "gen_aes_1", 128, &obj_handle);
@@ -122,13 +123,13 @@ int main(int argc, char * argv[])
 	ret_code = 0;
 
 exit_logout:
-	logout(session);
+//	logout(session);
 exit_session:
-	close_session(session);
+//	close_session(session);
 exit_finalize:
-	finalize();
+//	finalize();
 exit_unload:
-	unload_library();
+//	unload_library();
 
 	return ret_code;
 }
