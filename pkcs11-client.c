@@ -5,7 +5,7 @@
 	This only allows people to download and share your work for no commercial gain and for no other purposes.
 */
 
-#include "pkcs11-impl.h"
+#include "pkcs11-client.h"
 
 #define _GNU_SOURCE
 #include <stdio.h>

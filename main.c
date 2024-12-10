@@ -12,7 +12,7 @@
 #include <execinfo.h>
 #include <getopt.h>
 
-#include "pkcs11-impl.h"
+#include "pkcs11-client.h"
 
 #define MAX_SLOT_COUNT		50
 #define STACK_FRAMES		30
