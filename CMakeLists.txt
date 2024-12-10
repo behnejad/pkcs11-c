@@ -13,7 +13,7 @@ set(CMAKE_CXX_FLAGS "-fvisibility=hidden") # -pedantic
 #link_directories(/usr/local/lib/softhsm/)
 #link_directories(./feitian/)
 
-add_executable(cryptoki_test main.c)
+add_executable(cryptoki_test pkcs11-impl.c main.c)
 
 #target_link_libraries(cryptoki_test libsofthsm2.a)
 #target_link_libraries(cryptoki_test softhsm2)
