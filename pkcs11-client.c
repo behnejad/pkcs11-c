@@ -13,8 +13,20 @@
 #include <errno.h>
 #include <string.h>
 
-static CK_BBOOL yes = CK_TRUE;
-static CK_BBOOL no = CK_FALSE;
+#define CHECK_STATE_FIX(handle, st) \
+	do { \
+        if ((handle) == NULL) return PKCS11_ERR_NULL_PTR; \
+        if ((handle)->state != (st)) return PKCS11_ERR_WRONG_STATE; \
+    } while (0)
+
+#define CHECK_STATE_LESS(handle, st) \
+	do { \
+	if ((handle) == NULL) return PKCS11_ERR_NULL_PTR; \
+	if ((handle)->state < (st)) return PKCS11_ERR_WRONG_STATE; \
+	} while (0)
+
+static const CK_BBOOL yes = CK_TRUE;
+static const CK_BBOOL no = CK_FALSE;
 
 enum
 {
@@ -161,15 +173,7 @@ int pkcs11_load_functions(pkcs11_handle * handle)
 
 int pkcs11_init_library(pkcs11_handle * handle)
 {
-	if (handle == NULL)
-	{
-		return PKCS11_ERR_NULL_PTR;
-	}
-
-	if (handle->state != PKCS11_STATE_FUNCS_LOADED)
-	{
-		return PKCS11_ERR_WRONG_STATE;
-	}
+	CHECK_STATE_FIX(handle, PKCS11_STATE_FUNCS_LOADED);
 
 	handle->pkcs_error = handle->func_list->C_Initialize(NULL);
 	if (handle->pkcs_error != CKR_OK)
@@ -183,15 +187,7 @@ int pkcs11_init_library(pkcs11_handle * handle)
 
 int pkcs11_open_session(pkcs11_handle * handle, CK_SLOT_ID slot, CK_FLAGS flags)
 {
-	if (handle == NULL)
-	{
-		return PKCS11_ERR_NULL_PTR;
-	}
-
-	if (handle->state != PKCS11_STATE_INITIALIZED)
-	{
-		return PKCS11_ERR_WRONG_STATE;
-	}
+	CHECK_STATE_FIX(handle, PKCS11_STATE_INITIALIZED);
 
 	handle->pkcs_error = handle->func_list->C_OpenSession(slot, flags, NULL, NULL, &handle->session);
 	if (handle->pkcs_error != CKR_OK)
@@ -205,15 +201,7 @@ int pkcs11_open_session(pkcs11_handle * handle, CK_SLOT_ID slot, CK_FLAGS flags)
 
 int pkcs11_get_slot_list(pkcs11_handle * handle, int has_token, CK_SLOT_ID_PTR slot_list, CK_ULONG_PTR slot_count)
 {
-	if (handle == NULL)
-	{
-		return PKCS11_ERR_NULL_PTR;
-	}
-
-	if (handle->state < PKCS11_STATE_INITIALIZED)
-	{
-		return PKCS11_ERR_WRONG_STATE;
-	}
+	CHECK_STATE_LESS(handle, PKCS11_STATE_INITIALIZED);
 
 	handle->pkcs_error = handle->func_list->C_GetSlotList(has_token, slot_list, slot_count);
 	if (handle->pkcs_error != CKR_OK)
@@ -226,15 +214,7 @@ int pkcs11_get_slot_list(pkcs11_handle * handle, int has_token, CK_SLOT_ID_PTR s
 
 int pkcs11_get_slot_info(pkcs11_handle * handle, CK_SLOT_ID slot, CK_SLOT_INFO_PTR info)
 {
-	if (handle == NULL)
-	{
-		return PKCS11_ERR_NULL_PTR;
-	}
-
-	if (handle->state < PKCS11_STATE_INITIALIZED)
-	{
-		return PKCS11_ERR_WRONG_STATE;
-	}
+	CHECK_STATE_LESS(handle, PKCS11_STATE_INITIALIZED);
 
 	handle->pkcs_error = handle->func_list->C_GetSlotInfo(slot, info);
 	if (handle->pkcs_error != CKR_OK)
@@ -247,15 +227,7 @@ int pkcs11_get_slot_info(pkcs11_handle * handle, CK_SLOT_ID slot, CK_SLOT_INFO_P
 
 int pkcs11_get_token_info(pkcs11_handle * handle, CK_SLOT_ID slot, CK_TOKEN_INFO_PTR info)
 {
-	if (handle == NULL)
-	{
-		return PKCS11_ERR_NULL_PTR;
-	}
-
-	if (handle->state < PKCS11_STATE_INITIALIZED)
-	{
-		return PKCS11_ERR_WRONG_STATE;
-	}
+	CHECK_STATE_LESS(handle, PKCS11_STATE_INITIALIZED);
 
 	handle->pkcs_error = handle->func_list->C_GetTokenInfo(slot, info);
 	if (handle->pkcs_error != CKR_OK)
@@ -617,10 +589,5 @@ const char * pkcs11_pkcs11_get_last_error_str_internal(CK_RV code)
 
 const char * pkcs11_get_last_error_str(pkcs11_handle * handle)
 {
-	if (handle == NULL)
-	{
-		return NULL;
-	}
-
-	return pkcs11_pkcs11_get_last_error_str_internal(handle->pkcs_error);
+	return handle == NULL ? NULL : pkcs11_pkcs11_get_last_error_str_internal(handle->pkcs_error);
 }
