@@ -54,6 +54,8 @@
 
 #include "pkcs11.h"
 
+#include <dlfcn.h>
+
 #define PKCS11_DEFAULT_DLOPEN		RTLD_LAZY | RTLD_LOCAL
 #define MAX_LABEL_LEN				100
 
@@ -67,6 +69,7 @@ enum
 	PKCS11_ERR_HAS_STATE		 		= -5,
 	PKCS11_ERR_WRONG_STATE		 		= -6,
 	PKCS11_ERR_LIB_FUNC_NOT_FOUND		= -7,
+	PKCS11_ERR_PKCS11					= -8,
 };
 
 typedef struct pkcs11_handle_t pkcs11_handle;
@@ -77,30 +80,16 @@ extern "C"
 #endif
 
 const char * pkcs11_get_last_error_str(pkcs11_handle * handle);
-int pkcs11_free(pkcs11_handle * handle);
 pkcs11_handle * pkcs11_load_library(const char * path, int flags);
-int pkcs11_init(pkcs11_handle * handle);
-
-int init_pkcs();
-int get_slot_count(CK_ULONG_PTR count);
-int get_slot(CK_SLOT_ID_PTR list, CK_ULONG_PTR slot_count);
-int get_slot_info(CK_SLOT_ID slot);
-int open_session(CK_SLOT_ID slot, CK_SESSION_HANDLE_PTR session);
-int login(CK_SESSION_HANDLE session, int user, const char * pin);
-int logout(CK_SESSION_HANDLE session);
-int close_session(CK_SESSION_HANDLE session);
-int finalize();
-int unload_library();
-int generate_3des(CK_SESSION_HANDLE session, CK_UTF8CHAR_PTR label, CK_OBJECT_HANDLE_PTR objHandle);
-int generate_aes(CK_SESSION_HANDLE session, CK_UTF8CHAR_PTR label, CK_ULONG size, CK_OBJECT_HANDLE_PTR objHandle);
-int generate_rsa(CK_SESSION_HANDLE session, CK_UTF8CHAR_PTR label, CK_ULONG size,
-				 CK_OBJECT_HANDLE_PTR objPubHndl, CK_OBJECT_HANDLE_PTR objPriHandle);
-int generate_ecdsa(CK_SESSION_HANDLE session, CK_UTF8CHAR_PTR label, CK_BYTE_PTR curve, CK_ULONG size,
-				   CK_OBJECT_HANDLE_PTR objPubHndl, CK_OBJECT_HANDLE_PTR objPriHandle);
-int create_data(CK_SESSION_HANDLE session, CK_UTF8CHAR_PTR label, CK_UTF8CHAR_PTR value, CK_OBJECT_HANDLE_PTR objHandle);
-int seed_random(CK_SESSION_HANDLE session, CK_BYTE_PTR data_ptr, CK_ULONG size);
-int generate_random(CK_SESSION_HANDLE session, CK_BYTE_PTR data_ptr, CK_ULONG size);
-
+int pkcs11_load_functions(pkcs11_handle * handle);
+int pkcs11_init_library(pkcs11_handle * handle);
+int pkcs11_open_session(pkcs11_handle * handle, CK_SLOT_ID slot, CK_FLAGS flags);
+int pkcs11_get_slot_list(pkcs11_handle * handle, int has_token, CK_SLOT_ID_PTR slot_list, CK_ULONG_PTR slot_count);
+int pkcs11_get_slot_info(pkcs11_handle * handle, CK_SLOT_ID slot, CK_SLOT_INFO_PTR info);
+void pkcs11_print_slot_info(CK_SLOT_INFO_PTR slot_info);
+int pkcs11_get_token_info(pkcs11_handle * handle, CK_SLOT_ID slot, CK_TOKEN_INFO_PTR info);
+void pkcs11_print_token_info(CK_TOKEN_INFO_PTR token_info);
+int pkcs11_free(pkcs11_handle * handle);
 
 #ifdef __cplusplus
 }

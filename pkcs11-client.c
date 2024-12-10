@@ -12,7 +12,6 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
-#include <dlfcn.h>
 
 static CK_BBOOL yes = CK_TRUE;
 static CK_BBOOL no = CK_FALSE;
@@ -32,7 +31,7 @@ typedef struct pkcs11_handle_t
 	void * lib_handle;
 	CK_FUNCTION_LIST * func_list;
 	CK_SESSION_HANDLE session;
-	CK_RV last_error;
+	CK_RV pkcs_error;
 	int state;
 } pkcs11_handle;
 
@@ -45,26 +44,71 @@ int pkcs11_free(pkcs11_handle * handle)
 
 	if (handle->lib_handle == NULL)
 	{
-		return PKCS11_ERR_NULL_PTR;
+		if (handle->session != 0 || handle->state != PKCS11_STATE_NONE)
+		{
+			return PKCS11_ERR_WRONG_STATE;
+		}
+
+		return PKCS11_OK;
 	}
 
-	if (handle->state >= PKCS11_STATE_INITIALIZED)
+	if (handle->state >= PKCS11_STATE_HAS_SESSION && handle->session == 0)
 	{
-		return PKCS11_ERR_HAS_STATE;
+		return PKCS11_ERR_WRONG_STATE;
 	}
 
-	if (handle->session != 0)
+	if (handle->state == PKCS11_STATE_LOGGED_IN)
 	{
-		return PKCS11_ERR_SESSION_AVAILABLE;
+		handle->pkcs_error = handle->func_list->C_Logout(handle->session);
+		if (handle->pkcs_error != CKR_OK)
+		{
+			return PKCS11_ERR_PKCS11;
+		}
+
+		handle->state = PKCS11_STATE_HAS_SESSION;
 	}
 
-	if (handle->lib_handle != NULL && dlclose(handle->lib_handle) != 0)
+	if (handle->state == PKCS11_STATE_HAS_SESSION)
 	{
-		return PKCS11_ERR_UNLOAD_LIBRARY;
+		handle->pkcs_error = handle->func_list->C_CloseSession(handle->session);
+		if (handle->pkcs_error != CKR_OK)
+		{
+			return PKCS11_ERR_PKCS11;
+		}
+
+		handle->session = 0;
+		handle->state = PKCS11_STATE_INITIALIZED;
+	}
+
+	if (handle->state == PKCS11_STATE_INITIALIZED)
+	{
+		handle->pkcs_error = handle->func_list->C_Finalize(NULL);
+		if (handle->pkcs_error != CKR_OK)
+		{
+			return PKCS11_ERR_PKCS11;
+		}
+
+		handle->state = PKCS11_STATE_FUNCS_LOADED;
+	}
+
+	if (handle->state == PKCS11_STATE_FUNCS_LOADED)
+	{
+		handle->func_list = NULL;
+		handle->state = PKCS11_STATE_LIB_LOADED;
+	}
+
+	if (handle->state == PKCS11_STATE_LIB_LOADED)
+	{
+		if (dlclose(handle->lib_handle) != 0)
+		{
+			return PKCS11_ERR_UNLOAD_LIBRARY;
+		}
+
+		handle->state = PKCS11_STATE_NONE;
 	}
 
 	free(handle);
-	return 0;
+	return PKCS11_OK;
 }
 
 pkcs11_handle * pkcs11_load_library(const char * path, int flags)
@@ -86,18 +130,11 @@ pkcs11_handle * pkcs11_load_library(const char * path, int flags)
 	return handle;
 }
 
-int pkcs11_init(pkcs11_handle * handle)
+int pkcs11_load_functions(pkcs11_handle * handle)
 {
-	CK_RV rv;
-
 	if (handle == NULL)
 	{
 		return PKCS11_ERR_NULL_PTR;
-	}
-
-	if (handle->state >= PKCS11_STATE_INITIALIZED)
-	{
-		return PKCS11_ERR_HAS_STATE;
 	}
 
 	if (handle->state != PKCS11_STATE_FUNCS_LOADED && handle->state != PKCS11_STATE_LIB_LOADED)
@@ -112,124 +149,124 @@ int pkcs11_init(pkcs11_handle * handle)
 		return PKCS11_ERR_LIB_FUNC_NOT_FOUND;
 	}
 
-	rv = C_GetFunctionList(&handle->func_list);
-	if (rv != CKR_OK)
+	handle->pkcs_error = C_GetFunctionList(&handle->func_list);
+	if (handle->pkcs_error != CKR_OK)
 	{
-		return PKCS11_ERR;
+		return PKCS11_ERR_PKCS11;
 	}
 
 	handle->state = PKCS11_STATE_FUNCS_LOADED;
 	return PKCS11_OK;
 }
 
-int init_pkcs()
+int pkcs11_init_library(pkcs11_handle * handle)
 {
-	CK_RV rv;
-//	printf("%x - %x\n", pkcs11->C_Initialize, &C_Initialize);
-	rv = pkcs11->C_Initialize(NULL);
-	if (rv != CKR_OK)
+	if (handle == NULL)
 	{
-		printf("C_Initialize failed: %s\n", ckr_text(rv));
-		return -1;
+		return PKCS11_ERR_NULL_PTR;
 	}
 
-//	printf("initialized\n");
-	return 0;
+	if (handle->state != PKCS11_STATE_FUNCS_LOADED)
+	{
+		return PKCS11_ERR_WRONG_STATE;
+	}
+
+	handle->pkcs_error = handle->func_list->C_Initialize(NULL);
+	if (handle->pkcs_error != CKR_OK)
+	{
+		return PKCS11_ERR_PKCS11;
+	}
+
+	handle->state = PKCS11_STATE_INITIALIZED;
+	return PKCS11_OK;
 }
 
-int get_slot_count(CK_ULONG_PTR count)
+int pkcs11_open_session(pkcs11_handle * handle, CK_SLOT_ID slot, CK_FLAGS flags)
 {
-	CK_RV rv;
-	rv = pkcs11->C_GetSlotList(CK_TRUE, NULL, count);
-	if (rv != CKR_OK)
+	if (handle == NULL)
 	{
-		printf("C_GetSlotList failed: %s\n", ckr_text(rv));
-		return -1;
+		return PKCS11_ERR_NULL_PTR;
 	}
 
-	if (*count == 0)
+	if (handle->state != PKCS11_STATE_INITIALIZED)
 	{
-		printf("no slot are available\n");
-		return -1;
+		return PKCS11_ERR_WRONG_STATE;
 	}
 
-	return 0;
+	handle->pkcs_error = handle->func_list->C_OpenSession(slot, flags, NULL, NULL, &handle->session);
+	if (handle->pkcs_error != CKR_OK)
+	{
+		handle->session = 0;
+		return PKCS11_ERR_PKCS11;
+	}
+
+	return PKCS11_OK;
 }
 
-int get_slot(CK_SLOT_ID_PTR list, CK_ULONG_PTR slot_count)
+int pkcs11_get_slot_list(pkcs11_handle * handle, int has_token, CK_SLOT_ID_PTR slot_list, CK_ULONG_PTR slot_count)
 {
-	CK_RV rv;
-	rv = pkcs11->C_GetSlotList(CK_TRUE, list, slot_count);
-	if (rv != CKR_OK)
+	if (handle == NULL)
 	{
-		printf("C_GetSlotList failed: %s\n", ckr_text(rv));
-		return -1;
+		return PKCS11_ERR_NULL_PTR;
 	}
 
-	return 0;
+	if (handle->state < PKCS11_STATE_INITIALIZED)
+	{
+		return PKCS11_ERR_WRONG_STATE;
+	}
+
+	handle->pkcs_error = handle->func_list->C_GetSlotList(has_token, slot_list, slot_count);
+	if (handle->pkcs_error != CKR_OK)
+	{
+		return PKCS11_ERR_PKCS11;
+	}
+
+	return PKCS11_OK;
 }
 
-int get_slot_info(CK_SLOT_ID slot)
+int pkcs11_get_slot_info(pkcs11_handle * handle, CK_SLOT_ID slot, CK_SLOT_INFO_PTR info)
 {
-	CK_RV rv;
-	CK_SLOT_INFO slot_info;
-
-	printf("available slot: %lu - 0x%X\n", slot, slot);
-	rv = pkcs11->C_GetSlotInfo(slot, &slot_info);
-	if (rv != CKR_OK)
+	if (handle == NULL)
 	{
-		printf("C_GetSlotInfo %lu failed %s\n", slot, ckr_text(rv));
-	}
-	else
-	{
-		printf("\\_ Description:      %.*s\n", sizeof(slot_info.slotDescription), slot_info.slotDescription);
-		printf("\\_ Manufacture:      %.*s\n", sizeof(slot_info.manufacturerID), slot_info.manufacturerID);
-		printf("\\_ Firmware Version: %u.%u\n", slot_info.firmwareVersion.major, slot_info.firmwareVersion.minor);
-		printf("\\_ Hardware Version: %u.%u\n", slot_info.hardwareVersion.major, slot_info.hardwareVersion.minor);
-		printf("\\_ Flags:            0x%X\n", slot_info.flags);
+		return PKCS11_ERR_NULL_PTR;
 	}
 
-	CK_TOKEN_INFO token_nfo;
-	rv = pkcs11->C_GetTokenInfo(slot, &token_nfo);
-	if (rv != CKR_OK)
+	if (handle->state < PKCS11_STATE_INITIALIZED)
 	{
-		printf("C_GetTokenInfo %lu failed %s\n", slot, ckr_text(rv));
-	}
-	else
-	{
-		printf("\\____\n");
-		printf("\\_ Label:            %.*s\n", sizeof(token_nfo.label), token_nfo.label);
-		printf("\\_ Manufacture ID:   %.*s\n", sizeof(token_nfo.manufacturerID), token_nfo.manufacturerID);
-		printf("\\_ Model:            %.*s\n", sizeof(token_nfo.model), token_nfo.model);
-		printf("\\_ Firmware Version: %u.%u\n", token_nfo.firmwareVersion.major, token_nfo.firmwareVersion.minor);
-		printf("\\_ Hardware Version: %u.%u\n", token_nfo.hardwareVersion.major, token_nfo.hardwareVersion.minor);
-		printf("\\_ Serial Number:    %.*s\n", sizeof(token_nfo.serialNumber), token_nfo.serialNumber);
-		printf("\\_ UTC Time:         %.*s\n", sizeof(token_nfo.utcTime), token_nfo.utcTime);
-		printf("\\_ Flags:            0x%X\n", token_nfo.flags);
-		printf("\\_ Session:          %lu / %lu\n", token_nfo.ulSessionCount, token_nfo.ulMaxSessionCount);
-		printf("\\_ Private Memory:   %lu / %lu\n", token_nfo.ulFreePrivateMemory, token_nfo.ulTotalPrivateMemory);
-		printf("\\_ Free Public:      %lu / %lu\n", token_nfo.ulFreePublicMemory, token_nfo.ulTotalPublicMemory);
-		printf("\\_ Pin Length:       %lu / %lu\n", token_nfo.ulMinPinLen, token_nfo.ulMaxPinLen);
-		printf("\\_ RW Session:       %lu / %lu\n", token_nfo.ulRwSessionCount, token_nfo.ulMaxRwSessionCount);
+		return PKCS11_ERR_WRONG_STATE;
 	}
 
-	printf("\n");
-	return 0;
+	handle->pkcs_error = handle->func_list->C_GetSlotInfo(slot, info);
+	if (handle->pkcs_error != CKR_OK)
+	{
+		return PKCS11_ERR_PKCS11;
+	}
+
+	return PKCS11_OK;
 }
 
-int open_session(CK_SLOT_ID slot, CK_SESSION_HANDLE_PTR session)
+int pkcs11_get_token_info(pkcs11_handle * handle, CK_SLOT_ID slot, CK_TOKEN_INFO_PTR info)
 {
-	CK_RV rv;
-	rv = pkcs11->C_OpenSession(slot, CKF_SERIAL_SESSION | CKF_RW_SESSION, NULL, NULL, session);
-	if (rv != CKR_OK)
+	if (handle == NULL)
 	{
-		printf("C_OpenSession failed: %s\n", ckr_text(rv));
-		return -1;
+		return PKCS11_ERR_NULL_PTR;
 	}
 
-//	printf("Session id: %lu\n", *session);
-	return 0;
+	if (handle->state < PKCS11_STATE_INITIALIZED)
+	{
+		return PKCS11_ERR_WRONG_STATE;
+	}
+
+	handle->pkcs_error = handle->func_list->C_GetTokenInfo(slot, info);
+	if (handle->pkcs_error != CKR_OK)
+	{
+		return PKCS11_ERR_PKCS11;
+	}
+
+	return PKCS11_OK;
 }
+
+/*
 
 int login(CK_SESSION_HANDLE session, int user, const char * pin)
 {
@@ -242,62 +279,6 @@ int login(CK_SESSION_HANDLE session, int user, const char * pin)
 	}
 
 //	printf("logged in\n");
-	return 0;
-}
-
-int logout(CK_SESSION_HANDLE session)
-{
-	CK_RV rv;
-	rv = pkcs11->C_Logout(session);
-	if (rv != CKR_OK)
-	{
-		printf("C_Logout failed: %s\n", ckr_text(rv));
-		return -1;
-	}
-
-//	printf("logged out\n");
-	return 0;
-}
-
-int close_session(CK_SESSION_HANDLE session)
-{
-	CK_RV rv;
-	rv = pkcs11->C_CloseSession(session);
-	if (rv != CKR_OK)
-	{
-		printf("C_CloseSession failed: %s\n", ckr_text(rv));
-		return -1;
-	}
-
-//	printf("session closed %lu\n", session);
-	return 0;
-}
-
-int finalize()
-{
-	CK_RV rv;
-	rv = pkcs11->C_Finalize(NULL);
-	if (rv != CKR_OK)
-	{
-		printf("C_Finalize failed: %s\n", ckr_text(rv));
-		return -1;
-	}
-
-//	printf("finalized\n");
-	return 0;
-}
-
-int unload_library()
-{
-	if (libHandle != NULL)
-	{
-		if (dlclose(libHandle) != 0)
-		{
-			printf("dlclose failed: %d - %s\n", errno, strerror(errno));
-			return -1;
-		}
-	}
-
 	return 0;
 }
 
@@ -507,11 +488,36 @@ int generate_random(CK_SESSION_HANDLE session, CK_BYTE_PTR data_ptr, CK_ULONG si
 
 	return 0;
 }
+*/
 
-const char * pkcs11_get_last_error_str(pkcs11_handle * handle)
+void pkcs11_print_slot_info(CK_SLOT_INFO_PTR slot_info)
 {
-	if (handle == NULL) return NULL;
-	CK_RV code = handle->last_error;
+	printf("\\_ Description:      %.*s\n", sizeof(slot_info->slotDescription), slot_info->slotDescription);
+	printf("\\_ Manufacture:      %.*s\n", sizeof(slot_info->manufacturerID), slot_info->manufacturerID);
+	printf("\\_ Firmware Version: %u.%u\n", slot_info->firmwareVersion.major, slot_info->firmwareVersion.minor);
+	printf("\\_ Hardware Version: %u.%u\n", slot_info->hardwareVersion.major, slot_info->hardwareVersion.minor);
+	printf("\\_ Flags:            0x%X\n", slot_info->flags);
+}
+
+void pkcs11_print_token_info(CK_TOKEN_INFO_PTR token_info)
+{
+	printf("\\_ Label:            %.*s\n", sizeof(token_info->label), token_info->label);
+	printf("\\_ Manufacture ID:   %.*s\n", sizeof(token_info->manufacturerID), token_info->manufacturerID);
+	printf("\\_ Model:            %.*s\n", sizeof(token_info->model), token_info->model);
+	printf("\\_ Firmware Version: %u.%u\n", token_info->firmwareVersion.major, token_info->firmwareVersion.minor);
+	printf("\\_ Hardware Version: %u.%u\n", token_info->hardwareVersion.major, token_info->hardwareVersion.minor);
+	printf("\\_ Serial Number:    %.*s\n", sizeof(token_info->serialNumber), token_info->serialNumber);
+	printf("\\_ UTC Time:         %.*s\n", sizeof(token_info->utcTime), token_info->utcTime);
+	printf("\\_ Flags:            0x%X\n", token_info->flags);
+	printf("\\_ Session:          %lu / %lu\n", token_info->ulSessionCount, token_info->ulMaxSessionCount);
+	printf("\\_ Private Memory:   %lu / %lu\n", token_info->ulFreePrivateMemory, token_info->ulTotalPrivateMemory);
+	printf("\\_ Free Public:      %lu / %lu\n", token_info->ulFreePublicMemory, token_info->ulTotalPublicMemory);
+	printf("\\_ Pin Length:       %lu / %lu\n", token_info->ulMinPinLen, token_info->ulMaxPinLen);
+	printf("\\_ RW Session:       %lu / %lu\n", token_info->ulRwSessionCount, token_info->ulMaxRwSessionCount);
+}
+
+const char * pkcs11_pkcs11_get_last_error_str_internal(CK_RV code)
+{
 	if (code == CKR_OK) return "CKR_OK";
 	else if (code == CKR_CANCEL) return "CKR_CANCEL";
 	else if (code == CKR_HOST_MEMORY) return "CKR_HOST_MEMORY";
@@ -607,4 +613,14 @@ const char * pkcs11_get_last_error_str(pkcs11_handle * handle)
 	else if (code == CKR_FUNCTION_REJECTED) return "CKR_FUNCTION_REJECTED";
 	else if (code & CKR_VENDOR_DEFINED) return "CKR_VENDOR_DEFINED";
 	else return "CKR_UN_DEFINED";
+}
+
+const char * pkcs11_get_last_error_str(pkcs11_handle * handle)
+{
+	if (handle == NULL)
+	{
+		return NULL;
+	}
+
+	return pkcs11_pkcs11_get_last_error_str_internal(handle->pkcs_error);
 }

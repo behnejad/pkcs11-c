@@ -50,13 +50,6 @@ int main(int argc, char * argv[])
 		}
 	}
 
-	if (argc != 2)
-	{
-		printf("wrong number of parameters\n");
-		printf("usage: ./binary path_to_cryptoki.so \n", argv[0]);
-		return -1;
-	}
-
 	signal(SIGILL, signal_handler);
 	signal(SIGABRT, signal_handler);
 	signal(SIGFPE, signal_handler);
@@ -66,38 +59,41 @@ int main(int argc, char * argv[])
 
 	int ret_code = -1;
 	pkcs11_handle * handle = NULL;
-
-//	CK_SLOT_ID slot_list[MAX_SLOT_COUNT];
-//	CK_ULONG total_slot = MAX_SLOT_COUNT;
-//	CK_SESSION_HANDLE session;
+	CK_SLOT_ID slot_list[MAX_SLOT_COUNT];
+	CK_ULONG total_slot = MAX_SLOT_COUNT;
+	CK_SLOT_INFO slot_info;
+	CK_TOKEN_INFO token_info;
 
 	// ePass3003
 //	const char * SO_PIN = "rockey";
 //	const char * USER_PIN = "1234";
-//	const char * libPath = "../feitian/libshuttle_p11v220.so";
+//	const char * lib_path = "../feitian/libshuttle_p11v220.so";
 
 	// rastin talaee
 //	const char * SO_PIN = "rastin";
 //	const char * USER_PIN = "1234";
-//	const char * libPath = "../feitian/libRastinPKCS11.so";
+//	const char * lib_path = "../feitian/libRastinPKCS11.so";
 
 	// SoftHSM
 //	const char * SO_PIN = "5528999";
-//	const char * USER_PIN = "123456";
-//	const char * libPath = "/usr/local/lib/softhsm/libsofthsm2.so";
+	const char * USER_PIN = "123456";
+	const char * lib_path = "/usr/local/lib/softhsm/libsofthsm2.so";
 
-//	if (load_library(argv[1]) != 0) goto exit_unload;
-//	if (load_library(libPath) != 0) goto exit_unload;
+	handle = pkcs11_load_library(lib_path, PKCS11_DEFAULT_DLOPEN);
+	if (handle == NULL) return -1;
+	if (pkcs11_load_functions(handle) != 0) goto exit;
+	if (pkcs11_init_library(handle) != 0) goto exit;
+	if (pkcs11_get_slot_list(handle, 1, slot_list, &total_slot) != 0) goto exit;
+	for (CK_LONG i = 0; i < total_slot; ++i)
+	{
+		if (pkcs11_get_slot_info(handle, slot_list[i], &slot_info) == 0)
+			pkcs11_print_slot_info(&slot_info);
+		printf("\\____\n");
+		if (pkcs11_get_token_info(handle, slot_list[i], &token_info) == 0)
+			pkcs11_print_token_info(&token_info);
+	}
+	if (pkcs11_open_session(handle, slot_list[0], CKF_SERIAL_SESSION | CKF_RW_SESSION) != 0) goto exit;
 
-//	if (init_pkcs_library() != 0) goto exit_unload;
-
-//	if (init_pkcs() != 0) goto exit_finalize;
-
-//	if (get_slot_count(&total_slot) != 0) goto exit_finalize;
-
-//	if (get_slot(slot_list, &total_slot) != 0) goto exit_finalize;
-
-//	for (CK_LONG i = 0; i < total_slot; ++i) get_slot_info(slot_list[i]);
 
 //	if (open_session(slot_list[0], &session) != 0) goto exit_finalize;
 
@@ -121,15 +117,8 @@ int main(int argc, char * argv[])
 
 
 	ret_code = 0;
-
-exit_logout:
-//	logout(session);
-exit_session:
-//	close_session(session);
-exit_finalize:
-//	finalize();
-exit_unload:
-//	unload_library();
-
+exit:
+	printf("STATUS: %s\n", pkcs11_get_last_error_str(handle));
+	pkcs11_free(handle);
 	return ret_code;
 }
