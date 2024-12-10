@@ -97,6 +97,8 @@ int pkcs11_generate_aes(pkcs11_handle * handle, const char * label, size_t size)
 int pkcs11_generate_rsa(pkcs11_handle * handle, const char * label, CK_ULONG size, const char * expo, size_t expo_len);
 int pkcs11_generate_ecdsa(pkcs11_handle * handle, const char * label, const char * curve, size_t size);
 int pkcs11_create_data(pkcs11_handle * handle, const char * label, const char * value, size_t len);
+int pkcs11_seed_random(pkcs11_handle * handle, char * value, size_t size);
+int pkcs11_generate_random(pkcs11_handle * handle, char * value, size_t size);
 int pkcs11_free(pkcs11_handle * handle);
 
 void pkcs11_print_slot_info(CK_SLOT_INFO_PTR slot_info);

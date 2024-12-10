@@ -490,33 +490,51 @@ int pkcs11_create_data(pkcs11_handle * handle, const char * label, const char * 
 	return PKCS11_OK;
 }
 
-/*
-int seed_random(CK_SESSION_HANDLE session, CK_BYTE_PTR data_ptr, CK_ULONG size)
+int pkcs11_seed_random(pkcs11_handle * handle, char * value, size_t size)
 {
-	CK_RV rv;
-	rv = pkcs11->C_SeedRandom(session, data_ptr, size);
-	if (rv != CKR_OK)
+	CHECK_STATE_FIX(handle, PKCS11_STATE_LOGGED_IN);
+
+	if (value == NULL)
 	{
-		printf("C_SeedRandom failed: %s\n", ckr_text(rv));
-		return -1;
+		return PKCS11_ERR_NULL_PTR;
 	}
 
-	return 0;
-}
-
-int generate_random(CK_SESSION_HANDLE session, CK_BYTE_PTR data_ptr, CK_ULONG size)
-{
-	CK_RV rv;
-	rv = pkcs11->C_GenerateRandom(session, data_ptr, size);
-	if (rv != CKR_OK)
+	if (size == 0)
 	{
-		printf("C_GenerateRandom failed: %s\n", ckr_text(rv));
-		return -1;
+		return PKCS11_ERR_WRONG_LEN;
 	}
 
-	return 0;
+	handle->pkcs_error = handle->func_list->C_SeedRandom(handle->session, value, size);
+	if (handle->pkcs_error != CKR_OK)
+	{
+		return PKCS11_ERR_PKCS11;
+	}
+
+	return PKCS11_OK;
 }
-*/
+
+int pkcs11_generate_random(pkcs11_handle * handle, char * value, size_t size)
+{
+	CHECK_STATE_FIX(handle, PKCS11_STATE_LOGGED_IN);
+
+	if (value == NULL)
+	{
+		return PKCS11_ERR_NULL_PTR;
+	}
+
+	if (size == 0)
+	{
+		return PKCS11_ERR_WRONG_LEN;
+	}
+
+	handle->pkcs_error = handle->func_list->C_GenerateRandom(handle->session, value, size);
+	if (handle->pkcs_error != CKR_OK)
+	{
+		return PKCS11_ERR_PKCS11;
+	}
+
+	return PKCS11_OK;
+}
 
 void pkcs11_print_slot_info(CK_SLOT_INFO_PTR slot_info)
 {

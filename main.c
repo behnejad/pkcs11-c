@@ -66,6 +66,7 @@ int main(int argc, char * argv[])
 	const char publicExponent[] = {0x01, 0x00, 0x00, 0x00, 0x01}; //public exponent - 65537
 	const char curve[] = {0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22}; // hex representation for secp384r1 curve.
 	const char data[] = "random value";
+	char buffer[10] = {0};
 
 	// ePass3003
 //	const char * SO_PIN = "rockey";
@@ -102,10 +103,8 @@ int main(int argc, char * argv[])
 //	if (pkcs11_generate_rsa(handle, "gen_rsa_1", 2048, publicExponent, sizeof(publicExponent)) != 0) goto exit;
 //	if (pkcs11_generate_ecdsa(handle, "gen_ecdsa_1", curve, sizeof(curve)) != 0) goto exit;
 //	if (pkcs11_create_data(handle, "gen_data_1", data, strlen(data)) != 0) goto exit;
-
-//	char buffer[10] = {0};
-//	seed_random(session, buffer, sizeof(buffer));
-//	generate_random(session, buffer, sizeof(buffer));
+//	if (pkcs11_seed_random(handle, buffer, sizeof(buffer)) != 0) goto exit;
+//	if (pkcs11_generate_random(handle, buffer, sizeof(buffer)) != 0) goto exit;
 
 
 
