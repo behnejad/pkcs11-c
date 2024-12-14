@@ -8,6 +8,13 @@
 #include "pkcs11-lib.h"
 #include "pkcs11.h"
 
+#ifdef CK_SPEC
+#undef CK_SPEC
+#define CK_SPEC __attribute__ ((visibility ("default")))
+#endif
+
+
+
 CK_DEFINE_FUNCTION(CK_RV, C_Initialize)(
 		CK_VOID_PTR pInitArgs
 )
