@@ -13,6 +13,7 @@
 #include <getopt.h>
 
 #include "pkcs11-client.h"
+#include "pkcs11-util.h"
 
 #define MAX_SLOT_COUNT		50
 #define STACK_FRAMES		30
@@ -88,13 +89,13 @@ int main(int argc, char * argv[])
 	if (pkcs11_load_functions(handle) != 0) goto exit;
 	if (pkcs11_init_library(handle) != 0) goto exit;
 	if (pkcs11_get_slot_list(handle, 1, slot_list, &total_slot) != 0) goto exit;
-//	for (CK_LONG i = 0; i < total_slot; ++i){
-//		if (pkcs11_get_slot_info(handle, slot_list[i], &slot_info) == 0)
-//			pkcs11_print_slot_info(&slot_info);
-//		if (pkcs11_get_token_info(handle, slot_list[i], &token_info) == 0)
-//			pkcs11_print_token_info(&token_info);
-//		printf("\\____\n");
-//	}
+	for (CK_LONG i = 0; i < total_slot; ++i){
+		if (pkcs11_get_slot_info(handle, slot_list[i], &slot_info) == 0)
+			pkcs11_print_slot_info(&slot_info);
+		if (pkcs11_get_token_info(handle, slot_list[i], &token_info) == 0)
+			pkcs11_print_token_info(&token_info);
+		printf("\\____\n");
+	}
 	if (pkcs11_open_session(handle, slot_list[0], CKF_SERIAL_SESSION | CKF_RW_SESSION) != 0) goto exit;
 //	if (pkcs11_login(handle, CKU_SO, SO_PIN) != 0) goto exit;
 	if (pkcs11_login(handle, CKU_USER, USER_PIN) != 0) goto exit;

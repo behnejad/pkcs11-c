@@ -49,8 +49,8 @@
  * \_ CKA_ALWAYS_SENSITIVE: false
  */
 
-#ifndef PKCS_IMPL_H
-#define PKCS_IMPL_H 1
+#ifndef PKCS11_CLIENT_H
+#define PKCS11_CLIENT_H 1
 
 #include "pkcs11.h"
 
@@ -63,6 +63,11 @@
 
 #define PUBLIC_OBJECT_POST_FIX			"_pub"
 #define PRIVATE_OBJECT_POST_FIX			"_prv"
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 
 enum
 {
@@ -78,11 +83,6 @@ enum
 };
 
 typedef struct pkcs11_handle_t pkcs11_handle;
-
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
 pkcs11_handle * pkcs11_load_library(const char * path, int flags);
 int pkcs11_load_functions(pkcs11_handle * handle);
@@ -101,8 +101,6 @@ int pkcs11_seed_random(pkcs11_handle * handle, char * value, size_t size);
 int pkcs11_generate_random(pkcs11_handle * handle, char * value, size_t size);
 int pkcs11_free(pkcs11_handle * handle);
 
-void pkcs11_print_slot_info(CK_SLOT_INFO_PTR slot_info);
-void pkcs11_print_token_info(CK_TOKEN_INFO_PTR token_info);
 const char * pkcs11_get_last_error_str(pkcs11_handle * handle);
 
 
@@ -110,4 +108,4 @@ const char * pkcs11_get_last_error_str(pkcs11_handle * handle);
 }
 #endif
 
-#endif //PKCS_IMPL_H
+#endif //PKCS11_CLIENT_H
