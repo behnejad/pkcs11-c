@@ -542,7 +542,7 @@ int pkcs11_digest(pkcs11_handle * handle, int mode,
 				  const char * buffer, size_t buffer_size,
 				  char * out, size_t * out_size)
 {
-	CHECK_STATE_FIX(handle, PKCS11_STATE_LOGGED_IN); // TODO, check for login required
+	CHECK_STATE_FIX(handle, PKCS11_STATE_HAS_SESSION);
 
 	if (buffer == NULL)
 	{
@@ -577,7 +577,7 @@ int pkcs11_digest(pkcs11_handle * handle, int mode,
 
 int pkcs11_digest_parted(pkcs11_handle * handle, int mode, int state, char * buffer, size_t * size)
 {
-	CHECK_STATE_FIX(handle, PKCS11_STATE_LOGGED_IN); // TODO, check for login required
+	CHECK_STATE_FIX(handle, PKCS11_STATE_HAS_SESSION);
 
 	if (state < PKCS11_START || state > PKCS11_FINISH)
 	{

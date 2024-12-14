@@ -67,7 +67,8 @@ int main(int argc, char * argv[])
 	const char publicExponent[] = {0x01, 0x00, 0x00, 0x00, 0x01}; //public exponent - 65537
 	const char curve[] = {0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22}; // hex representation for secp384r1 curve.
 	const char data[] = "random value";
-	char buffer[10] = {0};
+	char buffer[1024] = {0};
+	size_t buffer_size = 0;
 
 	// ePass3003
 //	const char * SO_PIN = "rockey";
@@ -98,7 +99,7 @@ int main(int argc, char * argv[])
 	}
 	if (pkcs11_open_session(handle, slot_list[0], CKF_SERIAL_SESSION | CKF_RW_SESSION) != 0) goto exit;
 //	if (pkcs11_login(handle, CKU_SO, SO_PIN) != 0) goto exit;
-	if (pkcs11_login(handle, CKU_USER, USER_PIN) != 0) goto exit;
+//	if (pkcs11_login(handle, CKU_USER, USER_PIN) != 0) goto exit;
 //	if (pkcs11_generate_3des(handle, "gen_3des_1") != 0) goto exit;
 //	if (pkcs11_generate_aes(handle, "gen_aes_1", 128) != 0) goto exit;
 //	if (pkcs11_generate_rsa(handle, "gen_rsa_1", 2048, publicExponent, sizeof(publicExponent)) != 0) goto exit;
@@ -107,6 +108,16 @@ int main(int argc, char * argv[])
 //	if (pkcs11_seed_random(handle, buffer, sizeof(buffer)) != 0) goto exit;
 //	if (pkcs11_generate_random(handle, buffer, sizeof(buffer)) != 0) goto exit;
 
+//	buffer_size = sizeof(buffer);
+//	if (pkcs11_digest(handle, PKCS11_DIGEST_SHA1, "hello world!", 12, buffer, &buffer_size) != 0) goto exit;
+
+//	if (pkcs11_digest_parted(handle, PKCS11_DIGEST_SHA1, PKCS11_START, NULL, NULL) != 0) goto exit;
+//	buffer_size = 6;
+//	if (pkcs11_digest_parted(handle, PKCS11_DIGEST_SHA1, PKCS11_UPDATE, "hello ", &buffer_size) != 0) goto exit;
+//	buffer_size = 6;
+//	if (pkcs11_digest_parted(handle, PKCS11_DIGEST_SHA1, PKCS11_UPDATE, "world!", &buffer_size) != 0) goto exit;
+//	buffer_size = sizeof buffer;
+//	if (pkcs11_digest_parted(handle, PKCS11_DIGEST_SHA1, PKCS11_FINISH, buffer, &buffer_size) != 0) goto exit;
 
 
 	ret_code = 0;
