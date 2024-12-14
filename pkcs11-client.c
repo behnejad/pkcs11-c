@@ -48,6 +48,7 @@ typedef struct pkcs11_handle_t
 	CK_OBJECT_HANDLE last_object_handle;
 	CK_OBJECT_HANDLE last_object_public;
 	CK_OBJECT_HANDLE last_object_private;
+	int last_digest_mech;
 	int state;
 } pkcs11_handle;
 
@@ -491,11 +492,11 @@ int pkcs11_create_data(pkcs11_handle * handle, const char * label, const char * 
 	return PKCS11_OK;
 }
 
-int pkcs11_seed_random(pkcs11_handle * handle, char * value, size_t size)
+int pkcs11_seed_random(pkcs11_handle * handle, char * buffer, size_t size)
 {
 	CHECK_STATE_FIX(handle, PKCS11_STATE_LOGGED_IN);
 
-	if (value == NULL)
+	if (buffer == NULL)
 	{
 		return PKCS11_ERR_NULL_PTR;
 	}
@@ -505,7 +506,7 @@ int pkcs11_seed_random(pkcs11_handle * handle, char * value, size_t size)
 		return PKCS11_ERR_WRONG_LEN;
 	}
 
-	handle->pkcs_error = handle->func_list->C_SeedRandom(handle->session, value, size);
+	handle->pkcs_error = handle->func_list->C_SeedRandom(handle->session, buffer, size);
 	if (handle->pkcs_error != CKR_OK)
 	{
 		return PKCS11_ERR_PKCS11;
@@ -514,11 +515,11 @@ int pkcs11_seed_random(pkcs11_handle * handle, char * value, size_t size)
 	return PKCS11_OK;
 }
 
-int pkcs11_generate_random(pkcs11_handle * handle, char * value, size_t size)
+int pkcs11_generate_random(pkcs11_handle * handle, char * buffer, size_t size)
 {
 	CHECK_STATE_FIX(handle, PKCS11_STATE_LOGGED_IN);
 
-	if (value == NULL)
+	if (buffer == NULL)
 	{
 		return PKCS11_ERR_NULL_PTR;
 	}
@@ -528,10 +529,111 @@ int pkcs11_generate_random(pkcs11_handle * handle, char * value, size_t size)
 		return PKCS11_ERR_WRONG_LEN;
 	}
 
-	handle->pkcs_error = handle->func_list->C_GenerateRandom(handle->session, value, size);
+	handle->pkcs_error = handle->func_list->C_GenerateRandom(handle->session, buffer, size);
 	if (handle->pkcs_error != CKR_OK)
 	{
 		return PKCS11_ERR_PKCS11;
+	}
+
+	return PKCS11_OK;
+}
+
+int pkcs11_digest(pkcs11_handle * handle, int mode,
+				  const char * buffer, size_t buffer_size,
+				  char * out, size_t * out_size)
+{
+	CHECK_STATE_FIX(handle, PKCS11_STATE_LOGGED_IN); // TODO, check for login required
+
+	if (buffer == NULL)
+	{
+		return PKCS11_ERR_NULL_PTR;
+	}
+
+	if (buffer_size == 0)
+	{
+		return PKCS11_ERR_WRONG_LEN;
+	}
+
+	if (out_size == NULL)
+	{
+		return PKCS11_ERR_WRONG_LEN;
+	}
+
+	CK_MECHANISM mech = {mode};
+	handle->pkcs_error = handle->func_list->C_DigestInit(handle->session, &mech);
+	if (handle->pkcs_error != CKR_OK)
+	{
+		return PKCS11_ERR_PKCS11;
+	}
+
+	handle->pkcs_error = handle->func_list->C_Digest(handle->session, buffer, buffer_size, out, out_size);
+	if (handle->pkcs_error != CKR_OK)
+	{
+		return PKCS11_ERR_PKCS11;
+	}
+
+	return PKCS11_OK;
+}
+
+int pkcs11_digest_parted(pkcs11_handle * handle, int mode, int state, char * buffer, size_t * size)
+{
+	CHECK_STATE_FIX(handle, PKCS11_STATE_LOGGED_IN); // TODO, check for login required
+
+	if (state < PKCS11_START || state > PKCS11_FINISH)
+	{
+		return PKCS11_ERR_WRONG_STATE;
+	}
+
+	if (state == PKCS11_START)
+	{
+		CK_MECHANISM mech = {mode};
+		handle->pkcs_error = handle->func_list->C_DigestInit(handle->session, &mech);
+		if (handle->pkcs_error != CKR_OK)
+		{
+			return PKCS11_ERR_PKCS11;
+		}
+
+		handle->last_digest_mech = mode;
+	}
+	else if (handle->last_digest_mech != mode)
+	{
+		return PKCS11_ERR_WRONG_PARAMETER;
+	}
+	else if (state == PKCS11_UPDATE)
+	{
+		if (buffer == NULL || size == NULL)
+		{
+			return PKCS11_ERR_NULL_PTR;
+		}
+
+		if (*size == 0)
+		{
+			return PKCS11_ERR_WRONG_LEN;
+		}
+
+		handle->pkcs_error = handle->func_list->C_DigestUpdate(handle->session, buffer, *size);
+		if (handle->pkcs_error != CKR_OK)
+		{
+			return PKCS11_ERR_PKCS11;
+		}
+	}
+	else // if (state == PKCS11_FINISH)
+	{
+		if (size == NULL)
+		{
+			return PKCS11_ERR_NULL_PTR;
+		}
+
+		handle->pkcs_error = handle->func_list->C_DigestFinal(handle->session, buffer, size);
+		if (handle->pkcs_error != CKR_OK)
+		{
+			return PKCS11_ERR_PKCS11;
+		}
+
+		if (buffer != NULL)
+		{
+			handle->last_digest_mech = 0;
+		}
 	}
 
 	return PKCS11_OK;

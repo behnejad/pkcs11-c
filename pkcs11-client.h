@@ -74,12 +74,29 @@ enum
 	PKCS11_OK							= 0,
 	PKCS11_ERR 							= -1,
 	PKCS11_ERR_NULL_PTR 				= -2,
-	PKCS11_ERR_SESSION_AVAILABLE 		= -3,
+	PKCS11_ERR_WRONG_PARAMETER		 	= -3,
 	PKCS11_ERR_UNLOAD_LIBRARY	 		= -4,
 	PKCS11_ERR_WRONG_LEN		 		= -5,
 	PKCS11_ERR_WRONG_STATE		 		= -6,
 	PKCS11_ERR_LIB_FUNC_NOT_FOUND		= -7,
 	PKCS11_ERR_PKCS11					= -8,
+};
+
+enum
+{
+	PKCS11_DIGEST_MD5					= CKM_MD5,
+	PKCS11_DIGEST_SHA1					= CKM_SHA_1,
+	PKCS11_DIGEST_SHA224				= CKM_SHA224,
+	PKCS11_DIGEST_SHA256				= CKM_SHA256,
+	PKCS11_DIGEST_SHA384				= CKM_SHA384,
+	PKCS11_DIGEST_SHA512				= CKM_SHA512,
+};
+
+enum
+{
+	PKCS11_START						= 1 << 0,
+	PKCS11_UPDATE						= 1 << 1,
+	PKCS11_FINISH						= 1 << 2,
 };
 
 typedef struct pkcs11_handle_t pkcs11_handle;
@@ -97,8 +114,10 @@ int pkcs11_generate_aes(pkcs11_handle * handle, const char * label, size_t size)
 int pkcs11_generate_rsa(pkcs11_handle * handle, const char * label, CK_ULONG size, const char * expo, size_t expo_len);
 int pkcs11_generate_ecdsa(pkcs11_handle * handle, const char * label, const char * curve, size_t size);
 int pkcs11_create_data(pkcs11_handle * handle, const char * label, const char * value, size_t len);
-int pkcs11_seed_random(pkcs11_handle * handle, char * value, size_t size);
-int pkcs11_generate_random(pkcs11_handle * handle, char * value, size_t size);
+int pkcs11_seed_random(pkcs11_handle * handle, char * buffer, size_t size);
+int pkcs11_generate_random(pkcs11_handle * handle, char * buffer, size_t size);
+int pkcs11_digest(pkcs11_handle * handle, int mode, const char * buffer, size_t buffer_size, char * out, size_t * out_size);
+int pkcs11_digest_parted(pkcs11_handle * handle, int mode, int state, char * buffer, size_t * size); // buffer on finish is out buffer
 int pkcs11_free(pkcs11_handle * handle);
 
 const char * pkcs11_get_last_error_str(pkcs11_handle * handle);
