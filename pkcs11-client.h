@@ -31,7 +31,7 @@
  * 			\_ CKA_CLASS:		type of an object (public/private/secret/data/...) / CKO_ ...
  * 			\_ CKA_KEY_TYPE:	algorithm of key (AES/RSA/3DES/...)/ CKK_ ...
  * 			\_ CKA_SENSITIVE:	is true, not allowed to read objects. cannot make sensitive to none sensitive.
- * 			\_ CKA_EXTRACTABLE:	can be wrapped to extract. cannot make non-extractable to extractable.
+ * 			\_ CKA_EXTRACTABLE:	can be wrapped to extract. cannot make non-extractable to extractable. does not make value visible
  * 			\_ CKA_MODIFIABLE:	can be changed. cannot make read-only to be changeable.
  * 			\_ CKA_ENCRYPT:		permit to encrypt. cannot be set to private key.
  * 			\_ CKA_DECRYPT:		permit to decrypt. cannot be set to public key.
@@ -107,13 +107,20 @@ int pkcs11_init_library(pkcs11_handle * handle);
 int pkcs11_get_slot_list(pkcs11_handle * handle, int has_token, CK_SLOT_ID_PTR slot_list, CK_ULONG_PTR slot_count);
 int pkcs11_get_slot_info(pkcs11_handle * handle, CK_SLOT_ID slot, CK_SLOT_INFO_PTR info);
 int pkcs11_get_token_info(pkcs11_handle * handle, CK_SLOT_ID slot, CK_TOKEN_INFO_PTR info);
+int pkcs11_get_mechanism(pkcs11_handle * handle, CK_SLOT_ID slot, CK_MECHANISM_TYPE_PTR list, CK_ULONG_PTR count);
+int pkcs11_get_mechanism_info(pkcs11_handle * handle, CK_SLOT_ID slot, CK_MECHANISM_TYPE mech, CK_MECHANISM_INFO_PTR info);
 int pkcs11_open_session(pkcs11_handle * handle, CK_SLOT_ID slot, CK_FLAGS flags);
 int pkcs11_login(pkcs11_handle * handle, int user, const char * pin);
+int pkcs11_iterate_objects(pkcs11_handle * handle);
 int pkcs11_generate_3des(pkcs11_handle * handle, const char * label);
 int pkcs11_generate_aes(pkcs11_handle * handle, const char * label, size_t size);
 int pkcs11_generate_rsa(pkcs11_handle * handle, const char * label, CK_ULONG size, const char * expo, size_t expo_len);
 int pkcs11_generate_ecdsa(pkcs11_handle * handle, const char * label, const char * curve, size_t size);
+int pkcs11_delete_object(pkcs11_handle * handle, CK_OBJECT_HANDLE obj_handle);
 int pkcs11_create_data(pkcs11_handle * handle, const char * label, const char * value, size_t len);
+int pkcs11_create_secret(pkcs11_handle * handle, const char * label, int type, const char * value, size_t len);
+int pkcs11_encrypt(pkcs11_handle * handle, CK_OBJECT_HANDLE obj_handle, CK_MECHANISM_PTR mech, const char * buffer, size_t buffer_size, char * out, size_t * out_size);
+int pkcs11_encrypt_parted(pkcs11_handle * handle, CK_OBJECT_HANDLE obj_handle, CK_MECHANISM_PTR mech, int state, char * buffer, size_t * size);
 int pkcs11_seed_random(pkcs11_handle * handle, char * buffer, size_t size);
 int pkcs11_generate_random(pkcs11_handle * handle, char * buffer, size_t size);
 int pkcs11_digest(pkcs11_handle * handle, int mode, const char * buffer, size_t buffer_size, char * out, size_t * out_size);

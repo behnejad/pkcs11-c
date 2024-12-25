@@ -27,6 +27,8 @@ void pkcs11_print_token_flags(CK_FLAGS flags);
 void pkcs11_print_session_flags(CK_FLAGS flags);
 void pkcs11_print_otp_flags(CK_FLAGS flags);
 void pkcs11_print_flags(CK_FLAGS flags);
+void pkcs11_print_mechanism(CK_MECHANISM_TYPE mech_type);
+void pkcs11_print_mechanism_info(CK_MECHANISM_INFO_PTR mech_info);
 
 #ifdef __cplusplus
 }

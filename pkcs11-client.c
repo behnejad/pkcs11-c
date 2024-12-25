@@ -229,6 +229,76 @@ int pkcs11_get_token_info(pkcs11_handle * handle, CK_SLOT_ID slot, CK_TOKEN_INFO
 	return PKCS11_OK;
 }
 
+int pkcs11_get_mechanism(pkcs11_handle * handle, CK_SLOT_ID slot, CK_MECHANISM_TYPE_PTR list, CK_ULONG_PTR count)
+{
+	CHECK_STATE_LESS(handle, PKCS11_STATE_INITIALIZED);
+
+	handle->pkcs_error = handle->func_list->C_GetMechanismList(slot, list, count);
+	if (handle->pkcs_error != CKR_OK)
+	{
+		return PKCS11_ERR_PKCS11;
+	}
+
+	return PKCS11_OK;
+}
+
+int pkcs11_get_mechanism_info(pkcs11_handle * handle, CK_SLOT_ID slot, CK_MECHANISM_TYPE mech, CK_MECHANISM_INFO_PTR info)
+{
+	CHECK_STATE_LESS(handle, PKCS11_STATE_INITIALIZED);
+
+	handle->pkcs_error = handle->func_list->C_GetMechanismInfo(slot, mech, info);
+	if (handle->pkcs_error != CKR_OK)
+	{
+		return PKCS11_ERR_PKCS11;
+	}
+
+	return PKCS11_OK;
+}
+
+int pkcs11_iterate_objects(pkcs11_handle * handle)
+{
+	CHECK_STATE_LESS(handle, PKCS11_STATE_HAS_SESSION);
+
+	CK_OBJECT_HANDLE objHandle[10];
+	CK_ULONG objCount = 0;
+	CK_ULONG totalObjects = 0;
+//	CK_KEY_TYPE objType = CKK_AES;
+	CK_ATTRIBUTE attrib[] =
+	{
+//		{CKA_TOKEN, &yes, sizeof(CK_BBOOL)},
+//		{CKA_KEY_TYPE, &objType, sizeof(CK_KEY_TYPE)},
+	};
+	CK_ULONG attribLen = sizeof(attrib) / sizeof(*attrib);
+
+	handle->pkcs_error = handle->func_list->C_FindObjectsInit(handle->session, attrib, attribLen);
+	if (handle->pkcs_error != CKR_OK)
+	{
+		return PKCS11_ERR_PKCS11;
+	}
+
+	do
+	{
+		handle->pkcs_error = handle->func_list->C_FindObjects(handle->session, objHandle, 10, &objCount);
+		if (handle->pkcs_error != CKR_OK)
+		{
+			return PKCS11_ERR_PKCS11;
+		}
+
+		for (int i = 0; i < objCount; ++i)
+			printf("id: %lu\n", objHandle[i]);
+
+		totalObjects += objCount;
+	} while(objCount != 0);
+
+	handle->pkcs_error = handle->func_list->C_FindObjectsFinal(handle->session);
+	if (handle->pkcs_error != CKR_OK)
+	{
+		return PKCS11_ERR_PKCS11;
+	}
+
+	return PKCS11_OK;
+}
+
 int pkcs11_open_session(pkcs11_handle * handle, CK_SLOT_ID slot, CK_FLAGS flags)
 {
 	CHECK_STATE_FIX(handle, PKCS11_STATE_INITIALIZED);
@@ -286,13 +356,13 @@ int pkcs11_generate_3des(pkcs11_handle * handle, const char * label)
 	CK_MECHANISM mech = {CKM_DES3_KEY_GEN};
 	CK_ATTRIBUTE attrib[] =
 	{
-		{CKA_TOKEN,         &yes,       sizeof(CK_BBOOL)},
-		{CKA_PRIVATE,       &yes,       sizeof(CK_BBOOL)},
-		{CKA_SENSITIVE,     &yes,       sizeof(CK_BBOOL)},
-		{CKA_EXTRACTABLE,   &no,        sizeof(CK_BBOOL)},
-		{CKA_MODIFIABLE,    &no,        sizeof(CK_BBOOL)},
-		{CKA_ENCRYPT,       &yes,       sizeof(CK_BBOOL)},
-		{CKA_DECRYPT,       &yes,       sizeof(CK_BBOOL)},
+		{CKA_TOKEN,         &yes,               sizeof(yes)},
+		{CKA_PRIVATE,       &yes,               sizeof(yes)},
+		{CKA_SENSITIVE,     &yes,               sizeof(yes)},
+		{CKA_EXTRACTABLE,   &no,                sizeof(no)},
+		{CKA_MODIFIABLE,    &no,                sizeof(no)},
+		{CKA_ENCRYPT,       &yes,               sizeof(yes)},
+		{CKA_DECRYPT,       &yes,               sizeof(yes)},
 		{CKA_LABEL,         label,      strlen(label)}
 	};
 
@@ -331,13 +401,13 @@ int pkcs11_generate_aes(pkcs11_handle * handle, const char * label, size_t size)
 
 	CK_ATTRIBUTE attrib[] =
 	{
-		{CKA_TOKEN,         &yes,       sizeof(CK_BBOOL)},
-		{CKA_PRIVATE,       &yes,       sizeof(CK_BBOOL)},
-		{CKA_SENSITIVE,     &yes,       sizeof(CK_BBOOL)},
-		{CKA_EXTRACTABLE,   &yes,       sizeof(CK_BBOOL)},
-		{CKA_MODIFIABLE,    &yes,       sizeof(CK_BBOOL)},
-		{CKA_ENCRYPT,       &yes,       sizeof(CK_BBOOL)},
-		{CKA_DECRYPT,       &yes,       sizeof(CK_BBOOL)},
+		{CKA_TOKEN,         &yes,       sizeof(yes)},
+		{CKA_PRIVATE,       &yes,       sizeof(yes)},
+		{CKA_SENSITIVE,     &yes,       sizeof(yes)},
+		{CKA_EXTRACTABLE,   &no,        sizeof(no)},
+		{CKA_MODIFIABLE,    &yes,       sizeof(yes)},
+		{CKA_ENCRYPT,       &yes,       sizeof(yes)},
+		{CKA_DECRYPT,       &yes,       sizeof(yes)},
 		{CKA_LABEL,         label,      strlen(label)},
 		{CKA_VALUE_LEN,	    &size,		sizeof(size)}
 	};
@@ -374,10 +444,10 @@ int pkcs11_generate_rsa(pkcs11_handle * handle, const char * label, CK_ULONG siz
 
 	CK_ATTRIBUTE attribPub[] =
 	{
-		{CKA_TOKEN,             &yes,               sizeof(CK_BBOOL)},
-		{CKA_PRIVATE,           &no,                sizeof(CK_BBOOL)},
-		{CKA_VERIFY,            &yes,               sizeof(CK_BBOOL)},
-		{CKA_ENCRYPT,           &yes,               sizeof(CK_BBOOL)},
+		{CKA_TOKEN,             &yes,               sizeof(yes)},
+		{CKA_PRIVATE,           &no,            	sizeof(no)},
+		{CKA_VERIFY,            &yes,               sizeof(yes)},
+		{CKA_ENCRYPT,           &yes,               sizeof(yes)},
 		{CKA_MODULUS_BITS,      &size,          	sizeof(CK_ULONG)},
 		{CKA_PUBLIC_EXPONENT,   expo,    			expo_len}, // TODO, check reference
 		{CKA_LABEL,             &pubLabel,          strlen(pubLabel)}
@@ -386,11 +456,11 @@ int pkcs11_generate_rsa(pkcs11_handle * handle, const char * label, CK_ULONG siz
 
 	CK_ATTRIBUTE attribPri[] =
 	{
-		{CKA_TOKEN,             &yes,               sizeof(CK_BBOOL)},
-		{CKA_PRIVATE,           &yes,               sizeof(CK_BBOOL)},
-		{CKA_SIGN,              &yes,               sizeof(CK_BBOOL)},
-		{CKA_DECRYPT,           &yes,               sizeof(CK_BBOOL)},
-		{CKA_SENSITIVE,         &yes,               sizeof(CK_BBOOL)},
+		{CKA_TOKEN,             &yes,               sizeof(yes)},
+		{CKA_PRIVATE,           &yes,               sizeof(yes)},
+		{CKA_SIGN,              &yes,               sizeof(yes)},
+		{CKA_DECRYPT,           &yes,               sizeof(yes)},
+		{CKA_SENSITIVE,         &yes,               sizeof(yes)},
 		{CKA_LABEL,             &priLabel,          strlen(priLabel)}
 	};
 	CK_ULONG attribLenPri = sizeof(attribPri) / sizeof(*attribPri);
@@ -427,10 +497,10 @@ int pkcs11_generate_ecdsa(pkcs11_handle * handle, const char * label, const char
 
 	CK_ATTRIBUTE attribPub[] =
 	{
-		{CKA_TOKEN,             &yes,               sizeof(CK_BBOOL)},
-		{CKA_PRIVATE,           &no,                sizeof(CK_BBOOL)},
-		{CKA_VERIFY,            &yes,               sizeof(CK_BBOOL)},
-		{CKA_ENCRYPT,           &yes,               sizeof(CK_BBOOL)},
+		{CKA_TOKEN,             &yes,               sizeof(yes)},
+		{CKA_PRIVATE,           &no,      	        sizeof(no)},
+		{CKA_VERIFY,            &yes,               sizeof(yes)},
+		{CKA_ENCRYPT,           &yes,               sizeof(yes)},
 		{CKA_EC_PARAMS,			curve,		 		size},
 		{CKA_LABEL,             &pubLabel,          strlen(pubLabel)}
 	};
@@ -438,11 +508,11 @@ int pkcs11_generate_ecdsa(pkcs11_handle * handle, const char * label, const char
 
 	CK_ATTRIBUTE attribPri[] =
 	{
-		{CKA_TOKEN,             &yes,               sizeof(CK_BBOOL)},
-		{CKA_PRIVATE,           &yes,               sizeof(CK_BBOOL)},
-		{CKA_SIGN,              &yes,               sizeof(CK_BBOOL)},
-		{CKA_DECRYPT,           &yes,               sizeof(CK_BBOOL)},
-		{CKA_SENSITIVE,         &yes,               sizeof(CK_BBOOL)},
+		{CKA_TOKEN,             &yes,               sizeof(yes)},
+		{CKA_PRIVATE,           &yes,               sizeof(yes)},
+		{CKA_SIGN,              &yes,               sizeof(yes)},
+		{CKA_DECRYPT,           &yes,               sizeof(yes)},
+		{CKA_SENSITIVE,         &yes,               sizeof(yes)},
 		{CKA_LABEL,             &priLabel,          strlen(priLabel)}
 	};
 	CK_ULONG attribLenPri = sizeof(attribPri) / sizeof(*attribPri);
@@ -475,9 +545,54 @@ int pkcs11_create_data(pkcs11_handle * handle, const char * label, const char * 
 	CK_ATTRIBUTE attrib[] =
 	{
 		{CKA_CLASS,	    	&objClass,		sizeof(objClass)},
-		{CKA_TOKEN,         &yes,       	sizeof(CK_BBOOL)},
-		{CKA_PRIVATE,       &yes,       	sizeof(CK_BBOOL)},
-		{CKA_MODIFIABLE,    &no,        	sizeof(CK_BBOOL)},
+		{CKA_TOKEN,         &yes,       	sizeof(yes)},
+		{CKA_PRIVATE,       &yes,       	sizeof(yes)},
+		{CKA_MODIFIABLE,    &no,        	sizeof(no)},
+		{CKA_VALUE,	   		value,			len},
+		{CKA_LABEL,         label,    		strlen(label)}
+	};
+	CK_ULONG attribLen = sizeof(attrib) / sizeof(*attrib);
+
+	handle->pkcs_error = handle->func_list->C_CreateObject(handle->session, attrib, attribLen, &handle->last_object_handle);
+	if (handle->pkcs_error != CKR_OK)
+	{
+		return PKCS11_ERR_PKCS11;
+	}
+
+	return PKCS11_OK;
+}
+
+int pkcs11_create_secret(pkcs11_handle * handle, const char * label, int type, const char * value, size_t len)
+{
+	CHECK_STATE_FIX(handle, PKCS11_STATE_LOGGED_IN);
+
+	if (label == NULL || value == NULL)
+	{
+		return PKCS11_ERR_NULL_PTR;
+	}
+
+	if (strlen(label) > MAX_LABEL_LEN || len == 0)
+	{
+		return PKCS11_ERR_WRONG_LEN;
+	}
+
+	CK_OBJECT_CLASS objClass = CKO_SECRET_KEY;
+	CK_ATTRIBUTE_TYPE objType = type;
+	CK_ATTRIBUTE attrib[] =
+	{
+		{CKA_TOKEN,         &yes,       	sizeof(yes)},
+		{CKA_PRIVATE,       &yes,       	sizeof(yes)},
+		{CKA_MODIFIABLE,    &yes,        	sizeof(yes)},
+		{CKA_CLASS,	    	&objClass,		sizeof(objClass)},
+		{CKA_KEY_TYPE,		&objType,       sizeof(objType)},
+		{CKA_EXTRACTABLE,	&no, 	        sizeof(no)},
+		{CKA_SENSITIVE,     &yes,           sizeof(yes)},
+		{CKA_SIGN,			&no, 	        sizeof(no)},
+		{CKA_VERIFY,		&no, 	        sizeof(no)},
+		{CKA_DECRYPT,		&no, 	        sizeof(no)},
+		{CKA_ENCRYPT,		&yes, 	        sizeof(yes)},
+		{CKA_WRAP,			&no, 	        sizeof(no)},
+		{CKA_UNWRAP,		&no, 	        sizeof(no)},
 		{CKA_VALUE,	   		value,			len},
 		{CKA_LABEL,         label,    		strlen(label)}
 	};
@@ -530,6 +645,55 @@ int pkcs11_generate_random(pkcs11_handle * handle, char * buffer, size_t size)
 	}
 
 	handle->pkcs_error = handle->func_list->C_GenerateRandom(handle->session, buffer, size);
+	if (handle->pkcs_error != CKR_OK)
+	{
+		return PKCS11_ERR_PKCS11;
+	}
+
+	return PKCS11_OK;
+}
+
+int pkcs11_delete_object(pkcs11_handle * handle, CK_OBJECT_HANDLE obj_handle)
+{
+	CHECK_STATE_FIX(handle, PKCS11_STATE_LOGGED_IN);
+
+	handle->pkcs_error = handle->func_list->C_DestroyObject(handle->session, obj_handle);
+	if (handle->pkcs_error != CKR_OK)
+	{
+		return PKCS11_ERR_PKCS11;
+	}
+
+	return PKCS11_OK;
+}
+
+int pkcs11_encrypt(pkcs11_handle * handle, CK_OBJECT_HANDLE obj_handle, CK_MECHANISM_PTR mech,
+				   const char * buffer, size_t buffer_size,
+				   char * out, size_t * out_size)
+{
+	CHECK_STATE_FIX(handle, PKCS11_STATE_LOGGED_IN);
+
+	if (buffer == NULL)
+	{
+		return PKCS11_ERR_NULL_PTR;
+	}
+
+	if (buffer_size == 0)
+	{
+		return PKCS11_ERR_WRONG_LEN;
+	}
+
+	if (out_size == NULL)
+	{
+		return PKCS11_ERR_WRONG_LEN;
+	}
+
+	handle->pkcs_error = handle->func_list->C_EncryptInit(handle->session, mech, obj_handle);
+	if (handle->pkcs_error != CKR_OK)
+	{
+		return PKCS11_ERR_PKCS11;
+	}
+
+	handle->pkcs_error = handle->func_list->C_Encrypt(handle->session, buffer, buffer_size, out, out_size);
 	if (handle->pkcs_error != CKR_OK)
 	{
 		return PKCS11_ERR_PKCS11;
